@@ -5,6 +5,7 @@ import { ArrowLeft, Calendar, User, Globe, Archive, MessageSquare, Pencil, Mouse
 import { FavoriteButton } from '@/components/bookmarks/FavoriteButton'
 import { RatingStars } from '@/components/bookmarks/RatingStars'
 import { VisitButton } from '@/components/bookmarks/VisitButton'
+import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 import { CommentForm } from '@/components/comments/CommentForm'
 import { CommentList } from '@/components/comments/CommentList'
 
@@ -97,7 +98,14 @@ export default async function BookmarkPage({
       <div className={`bg-white border border-gray-200 rounded-lg p-6 ${isArchived ? 'opacity-75' : ''}`}>
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">{bookmark.title}</h1>
+          <div className="flex items-start gap-3">
+            <BookmarkFavicon 
+              faviconUrl={bookmark.favicon_url} 
+              title={bookmark.title} 
+              size="lg" 
+            />
+            <h1 className="text-2xl font-bold text-gray-900">{bookmark.title}</h1>
+          </div>
           <div className="flex items-center gap-2 shrink-0">
             {!isArchived && <FavoriteButton bookmarkId={bookmark.id} />}
             {/* Edit button for creator */}
