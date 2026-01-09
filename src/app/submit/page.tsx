@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Plus, X, Check, FolderOpen, Lock, Loader2, Sparkles } from 'lucide-react'
+import { getFaviconUrl } from '@/lib/utils/favicon'
+import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 
 interface TagType {
   id: string
@@ -33,6 +35,7 @@ export default function SubmitPage() {
   const [user, setUser] = useState<any>(null)
   const [fetchingTitle, setFetchingTitle] = useState(false)
   const [titleFetched, setTitleFetched] = useState(false)
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(null)
   
   const router = useRouter()
   const supabase = createClient()
@@ -73,6 +76,16 @@ export default function SubmitPage() {
     }
     fetchTags()
   }, [supabase, router])
+
+  // Update favicon when URL changes
+  useEffect(() => {
+    if (url) {
+      const favicon = getFaviconUrl(url)
+      setFaviconUrl(favicon)
+    } else {
+      setFaviconUrl(null)
+    }
+  }, [url])
 
   // Debounced fetch title function
   const fetchPageTitle = useCallback(async (urlToFetch: string) => {
@@ -205,7 +218,10 @@ export default function SubmitPage() {
       return
     }
 
-    // Create bookmark (without group_id - use junction table instead)
+    // Generate favicon URL
+    const bookmarkFaviconUrl = getFaviconUrl(url)
+
+    // Create bookmark with favicon_url
     const { data: bookmark, error: bookmarkError } = await supabase
       .from('bookmarks')
       .insert({
@@ -215,6 +231,7 @@ export default function SubmitPage() {
         visibility,
         status: 'active',
         creator_id: user.id,
+        favicon_url: bookmarkFaviconUrl,
       })
       .select()
       .single()
@@ -236,7 +253,6 @@ export default function SubmitPage() {
       
       if (groupError) {
         console.error('Error adding bookmark to group:', groupError)
-        // Don't fail the whole submission, bookmark is already created
       }
     }
 
@@ -249,10 +265,9 @@ export default function SubmitPage() {
       await supabase.from('bookmark_tags').insert(tagInserts)
     }
 
-    // Create and add custom tags (using created_by for tags table)
+    // Create and add custom tags
     if (customTags.length > 0 && bookmark) {
       for (const tagName of customTags) {
-        // Create the new tag
         const { data: newTag } = await supabase
           .from('tags')
           .insert({
@@ -264,7 +279,6 @@ export default function SubmitPage() {
           .select()
           .single()
 
-        // Link tag to bookmark
         if (newTag) {
           await supabase.from('bookmark_tags').insert({
             bookmark_id: bookmark.id,
@@ -309,6 +323,7 @@ export default function SubmitPage() {
                 setVisibility('public')
                 setSelectedGroupId(null)
                 setTitleFetched(false)
+                setFaviconUrl(null)
               }}
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
             >
@@ -348,15 +363,22 @@ export default function SubmitPage() {
               <LinkIcon className="h-4 w-4" />
               URL *
             </label>
-            <input
-              id="url"
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              required
-              placeholder="https://example.com/article"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-            />
+            <div className="flex gap-2">
+              {faviconUrl && (
+                <div className="flex items-center justify-center w-10 h-10 bg-gray-50 border border-gray-300 rounded-lg">
+                  <BookmarkFavicon faviconUrl={faviconUrl} title={title || 'Preview'} size="md" />
+                </div>
+              )}
+              <input
+                id="url"
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                required
+                placeholder="https://example.com/article"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              />
+            </div>
             {fetchingTitle && (
               <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                 <Loader2 className="h-3 w-3 animate-spin" />
