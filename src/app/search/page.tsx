@@ -62,12 +62,8 @@ export default async function SearchPage({
   } else if (visibility === 'private' && user) {
     bookmarksQuery = bookmarksQuery.eq('visibility', 'private').eq('creator_id', user.id)
   } else {
-    // Default: show public + user's private
-    if (user) {
-      bookmarksQuery = bookmarksQuery.or(`visibility.eq.public,and(visibility.eq.private,creator_id.eq.${user.id})`)
-    } else {
-      bookmarksQuery = bookmarksQuery.eq('visibility', 'public')
-    }
+    // Default: show only public bookmarks (simpler approach)
+    bookmarksQuery = bookmarksQuery.eq('visibility', 'public')
   }
   
   // Text search
@@ -91,7 +87,12 @@ export default async function SearchPage({
     bookmarksQuery = bookmarksQuery.order('created_at', { ascending: false })
   }
   
-  const { data } = await bookmarksQuery.limit(50)
+  const { data, error } = await bookmarksQuery.limit(50)
+  
+  if (error) {
+    console.error('Search error:', error)
+  }
+  
   bookmarks = data || []
   
   // Filter by tag if specified (post-query since nested filter is tricky)
@@ -121,24 +122,24 @@ export default async function SearchPage({
   const baseUrl = '/search'
   
   if (query) {
-    const newParams = new URLSearchParams(params as any)
-    newParams.delete('q')
+    const newParams = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v && k !== 'q') newParams.set(k, v) })
     activeFilters.push({ 
       label: `"${query}"`, 
       removeUrl: `${baseUrl}?${newParams.toString()}` 
     })
   }
   if (tag) {
-    const newParams = new URLSearchParams(params as any)
-    newParams.delete('tag')
+    const newParams = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v && k !== 'tag') newParams.set(k, v) })
     activeFilters.push({ 
       label: `Tag: ${tag}`, 
       removeUrl: `${baseUrl}?${newParams.toString()}` 
     })
   }
   if (domain) {
-    const newParams = new URLSearchParams(params as any)
-    newParams.delete('domain')
+    const newParams = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v && k !== 'domain') newParams.set(k, v) })
     activeFilters.push({ 
       label: `Domain: ${domain}`, 
       removeUrl: `${baseUrl}?${newParams.toString()}` 
