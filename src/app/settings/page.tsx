@@ -6,10 +6,39 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { ArrowLeft, User, Mail, Calendar, Shield, Save, Check } from 'lucide-react'
 
+// 25 avatar options - fun, inclusive, non-human icons
+const AVATAR_OPTIONS = [
+  { id: 'cat', emoji: '🐱', label: 'Cat' },
+  { id: 'dog', emoji: '🐶', label: 'Dog' },
+  { id: 'fox', emoji: '🦊', label: 'Fox' },
+  { id: 'panda', emoji: '🐼', label: 'Panda' },
+  { id: 'koala', emoji: '🐨', label: 'Koala' },
+  { id: 'lion', emoji: '🦁', label: 'Lion' },
+  { id: 'tiger', emoji: '🐯', label: 'Tiger' },
+  { id: 'bear', emoji: '🐻', label: 'Bear' },
+  { id: 'rabbit', emoji: '🐰', label: 'Rabbit' },
+  { id: 'owl', emoji: '🦉', label: 'Owl' },
+  { id: 'penguin', emoji: '🐧', label: 'Penguin' },
+  { id: 'butterfly', emoji: '🦋', label: 'Butterfly' },
+  { id: 'dolphin', emoji: '🐬', label: 'Dolphin' },
+  { id: 'unicorn', emoji: '🦄', label: 'Unicorn' },
+  { id: 'dragon', emoji: '🐉', label: 'Dragon' },
+  { id: 'rocket', emoji: '🚀', label: 'Rocket' },
+  { id: 'star', emoji: '⭐', label: 'Star' },
+  { id: 'sun', emoji: '🌞', label: 'Sun' },
+  { id: 'moon', emoji: '🌙', label: 'Moon' },
+  { id: 'rainbow', emoji: '🌈', label: 'Rainbow' },
+  { id: 'flower', emoji: '🌸', label: 'Flower' },
+  { id: 'tree', emoji: '🌳', label: 'Tree' },
+  { id: 'mountain', emoji: '🏔️', label: 'Mountain' },
+  { id: 'crystal', emoji: '💎', label: 'Crystal' },
+  { id: 'robot', emoji: '🤖', label: 'Robot' },
+]
+
 export default function SettingsPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState('')
+  const [selectedAvatar, setSelectedAvatar] = useState('')
   const [role, setRole] = useState('')
   const [createdAt, setCreatedAt] = useState('')
   const [loading, setLoading] = useState(true)
@@ -42,7 +71,7 @@ export default function SettingsPage() {
       
       if (profile) {
         setName(profile.name || '')
-        setAvatarUrl(profile.avatar_url || '')
+        setSelectedAvatar(profile.avatar_url || '')
         setRole(profile.role || 'user')
         setCreatedAt(profile.created_at)
       }
@@ -63,7 +92,7 @@ export default function SettingsPage() {
       .from('users')
       .update({
         name,
-        avatar_url: avatarUrl || null,
+        avatar_url: selectedAvatar || null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)
@@ -77,6 +106,8 @@ export default function SettingsPage() {
 
     setSaving(false)
   }
+
+  const currentAvatar = AVATAR_OPTIONS.find(a => a.id === selectedAvatar)
 
   if (loading) {
     return (
@@ -122,6 +153,50 @@ export default function SettingsPage() {
           </div>
         )}
 
+        {/* Current Avatar Preview */}
+        <div className="flex items-center gap-4">
+          <div className="w-20 h-20 rounded-full bg-primary-100 flex items-center justify-center text-4xl border-2 border-primary-200">
+            {currentAvatar ? currentAvatar.emoji : <User className="h-10 w-10 text-primary-600" />}
+          </div>
+          <div>
+            <p className="font-medium text-gray-900">{currentAvatar ? currentAvatar.label : 'No avatar selected'}</p>
+            <p className="text-sm text-gray-500">Choose an avatar below</p>
+          </div>
+        </div>
+
+        {/* Avatar Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Choose Your Avatar
+          </label>
+          <div className="grid grid-cols-5 gap-3">
+            {AVATAR_OPTIONS.map((avatar) => (
+              <button
+                key={avatar.id}
+                type="button"
+                onClick={() => setSelectedAvatar(avatar.id)}
+                className={`w-14 h-14 rounded-xl flex items-center justify-center text-2xl transition-all ${
+                  selectedAvatar === avatar.id
+                    ? 'bg-primary-100 border-2 border-primary-500 scale-110 shadow-md'
+                    : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100 hover:scale-105'
+                }`}
+                title={avatar.label}
+              >
+                {avatar.emoji}
+              </button>
+            ))}
+          </div>
+          {selectedAvatar && (
+            <button
+              type="button"
+              onClick={() => setSelectedAvatar('')}
+              className="mt-3 text-sm text-gray-500 hover:text-gray-700"
+            >
+              Clear selection
+            </button>
+          )}
+        </div>
+
         {/* Name */}
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -135,31 +210,6 @@ export default function SettingsPage() {
             placeholder="Your name"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
           />
-        </div>
-
-        {/* Avatar URL */}
-        <div>
-          <label htmlFor="avatar" className="block text-sm font-medium text-gray-700 mb-1">
-            Avatar URL
-          </label>
-          <input
-            id="avatar"
-            type="url"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-            placeholder="https://example.com/avatar.jpg"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-          />
-          {avatarUrl && (
-            <div className="mt-2">
-              <img 
-                src={avatarUrl} 
-                alt="Avatar preview" 
-                className="w-16 h-16 rounded-full object-cover border border-gray-200"
-                onError={(e) => (e.currentTarget.style.display = 'none')}
-              />
-            </div>
-          )}
         </div>
 
         {/* Save Button */}
@@ -203,25 +253,6 @@ export default function SettingsPage() {
         <p className="text-xs text-gray-500 mt-4">
           To change your email or password, please contact an administrator.
         </p>
-      </div>
-
-      {/* Stats */}
-      <div className="mt-6 bg-white border border-gray-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Activity</h2>
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <Link href="/bookmarks" className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100">
-            <div className="text-2xl font-bold text-primary-600">-</div>
-            <div className="text-sm text-gray-600">Bookmarks</div>
-          </Link>
-          <Link href="/favorites" className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100">
-            <div className="text-2xl font-bold text-red-500">-</div>
-            <div className="text-sm text-gray-600">Favorites</div>
-          </Link>
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="text-2xl font-bold text-amber-500">-</div>
-            <div className="text-sm text-gray-600">Ratings</div>
-          </div>
-        </div>
       </div>
     </div>
   )
