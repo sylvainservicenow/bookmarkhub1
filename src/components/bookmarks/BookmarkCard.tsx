@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ExternalLink, Star, MousePointerClick, Heart } from 'lucide-react'
+import { ExternalLink, Star, Heart } from 'lucide-react'
 import { BookmarkFavicon } from './BookmarkFavicon'
 
 interface BookmarkCardProps {
@@ -9,7 +9,6 @@ interface BookmarkCardProps {
     url: string
     description: string | null
     favicon_url?: string | null
-    click_count?: number
     bookmark_tags?: { tags: { id?: string; name: string } | null }[]
     ratings?: { rating: number }[]
   }
@@ -24,7 +23,6 @@ export function BookmarkCard({ bookmark, isFavorited = false, showFavorite = fal
     : null
 
   const tags = bookmark.bookmark_tags?.map(bt => bt.tags?.name).filter(Boolean) || []
-  const clickCount = bookmark.click_count || 0
 
   // Extract domain from URL
   let domain = ''
@@ -61,7 +59,7 @@ export function BookmarkCard({ bookmark, isFavorited = false, showFavorite = fal
             </p>
           )}
           
-          {/* Stats row: domain, rating, clicks, favorite */}
+          {/* Stats row: domain, rating */}
           <div className="flex items-center flex-wrap gap-3 mt-2 text-sm">
             {domain && (
               <Link 
@@ -77,12 +75,6 @@ export function BookmarkCard({ bookmark, isFavorited = false, showFavorite = fal
               <Star className={`h-4 w-4 ${avgRating !== null ? 'fill-current' : ''}`} />
               {avgRating !== null ? avgRating.toFixed(1) : '-'}
               <span className="text-gray-400 text-xs">({ratings.length})</span>
-            </span>
-            
-            {/* Always show clicks */}
-            <span className="flex items-center gap-1 text-gray-400">
-              <MousePointerClick className="h-4 w-4" />
-              {clickCount}
             </span>
           </div>
           
