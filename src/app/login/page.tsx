@@ -4,13 +4,16 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { BookmarkIcon } from 'lucide-react'
+import { BookmarkIcon, Mail } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showResendOption, setShowResendOption] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/dashboard'
@@ -19,6 +22,8 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setShowResendOption(false)
+    setResendSuccess(false)
     setLoading(true)
 
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
@@ -28,6 +33,10 @@ export default function LoginPage() {
 
     if (signInError) {
       setError(signInError.message)
+      // Show resend option if email not confirmed
+      if (signInError.message.toLowerCase().includes('email not confirmed')) {
+        setShowResendOption(true)
+      }
       setLoading(false)
       return
     }
@@ -41,7 +50,6 @@ export default function LoginPage() {
         .single()
 
       if (profile?.status === 'suspended') {
-        // Sign out the user
         await supabase.auth.signOut()
         setError('Your account has been suspended. Please contact an administrator.')
         setLoading(false)
@@ -49,7 +57,6 @@ export default function LoginPage() {
       }
 
       if (profile?.status === 'archived') {
-        // Sign out the user
         await supabase.auth.signOut()
         setError('Your account has been archived. Please contact an administrator to restore it.')
         setLoading(false)
@@ -59,6 +66,30 @@ export default function LoginPage() {
 
     router.push(redirect)
     router.refresh()
+  }
+
+  const handleResendConfirmation = async () => {
+    if (!email) {
+      setError('Please enter your email address first')
+      return
+    }
+
+    setResendLoading(true)
+    setError(null)
+
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+    })
+
+    if (resendError) {
+      setError(resendError.message)
+    } else {
+      setResendSuccess(true)
+      setShowResendOption(false)
+    }
+
+    setResendLoading(false)
   }
 
   return (
@@ -74,6 +105,29 @@ export default function LoginPage() {
           {error && (
             <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
               {error}
+            </div>
+          )}
+
+          {resendSuccess && (
+            <div className="bg-green-50 text-green-600 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              Confirmation email sent! Please check your inbox.
+            </div>
+          )}
+
+          {showResendOption && (
+            <div className="bg-amber-50 border border-amber-200 px-4 py-3 rounded-lg">
+              <p className="text-amber-800 text-sm mb-2">
+                Your email hasn't been confirmed yet.
+              </p>
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                disabled={resendLoading}
+                className="text-sm font-medium text-amber-700 hover:text-amber-800 underline disabled:opacity-50"
+              >
+                {resendLoading ? 'Sending...' : 'Resend confirmation email'}
+              </button>
             </div>
           )}
 
