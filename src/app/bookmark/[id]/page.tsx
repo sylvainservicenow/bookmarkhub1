@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ExternalLink, Star, ArrowLeft, Calendar, User, Globe, Archive } from 'lucide-react'
+import { ExternalLink, ArrowLeft, Calendar, User, Globe, Archive } from 'lucide-react'
 import { FavoriteButton } from '@/components/bookmarks/FavoriteButton'
+import { RatingStars } from '@/components/bookmarks/RatingStars'
 
 export default async function BookmarkPage({
   params,
@@ -37,7 +38,7 @@ export default async function BookmarkPage({
   const ratings = bookmark.ratings || []
   const avgRating = ratings.length > 0
     ? ratings.reduce((sum: number, r: any) => sum + r.rating, 0) / ratings.length
-    : null
+    : 0
 
   // Extract domain from URL
   let domain = ''
@@ -115,20 +116,28 @@ export default async function BookmarkPage({
           </div>
         )}
 
+        {/* Rating Section */}
+        {!isArchived && (
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <h2 className="text-sm font-medium text-gray-700 mb-3">Rate this bookmark</h2>
+            <RatingStars 
+              bookmarkId={bookmark.id} 
+              totalRatings={ratings.length}
+              averageRating={avgRating}
+            />
+          </div>
+        )}
+
         {/* Meta info */}
         <div className="flex flex-wrap gap-6 mt-6 pt-6 border-t border-gray-200 text-sm text-gray-500">
           {domain && (
-            <div className="flex items-center gap-2">
+            <Link 
+              href={`/search?domain=${encodeURIComponent(domain)}`}
+              className="flex items-center gap-2 hover:text-primary-600"
+            >
               <Globe className="h-4 w-4" />
               {domain}
-            </div>
-          )}
-          
-          {avgRating !== null && (
-            <div className="flex items-center gap-2">
-              <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
-              {avgRating.toFixed(1)} ({ratings.length} {ratings.length === 1 ? 'rating' : 'ratings'})
-            </div>
+            </Link>
           )}
 
           {bookmark.click_count > 0 && (
