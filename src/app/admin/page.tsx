@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, Users, Bookmark, Tag, Shield, Clock, FolderPlus, CheckSquare } from 'lucide-react'
+import { ArrowLeft, Users, Bookmark, Tag, Shield, Clock, FolderOpen, CheckSquare } from 'lucide-react'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -28,26 +28,28 @@ export default async function AdminPage() {
     { count: userCount },
     { count: bookmarkCount },
     { count: tagCount },
-    { count: pendingBookmarksCount },
-    { count: pendingGroupRequestsCount },
+    { count: groupCount },
     { count: pendingSubmissionsCount },
     { count: pendingMembershipCount },
+    { count: pendingGroupCreationCount },
     { count: pendingCommentFlagsCount },
     { count: pendingArchiveCount },
   ] = await Promise.all([
     supabase.from('users').select('*', { count: 'exact', head: true }),
     supabase.from('bookmarks').select('*', { count: 'exact', head: true }),
     supabase.from('tags').select('*', { count: 'exact', head: true }),
-    supabase.from('bookmarks').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabase.from('group_creation_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase.from('groups').select('*', { count: 'exact', head: true }),
     supabase.from('submissions').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('group_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    supabase.from('group_creation_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('comment_flags').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('archive_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
   ])
 
-  const totalPendingApprovals = (pendingSubmissionsCount || 0) + (pendingGroupRequestsCount || 0) + 
+  const totalPendingApprovals = (pendingSubmissionsCount || 0) + (pendingGroupCreationCount || 0) + 
     (pendingMembershipCount || 0) + (pendingCommentFlagsCount || 0) + (pendingArchiveCount || 0)
+
+  const pendingGroupRelated = (pendingGroupCreationCount || 0) + (pendingMembershipCount || 0)
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -67,7 +69,7 @@ export default async function AdminPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
-            <p className="text-gray-600">Manage users, bookmarks, tags, and approvals</p>
+            <p className="text-gray-600">Manage users, bookmarks, tags, groups, and approvals</p>
           </div>
         </div>
       </div>
@@ -96,14 +98,14 @@ export default async function AdminPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <Link 
           href="/admin/users"
           className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition-all"
         >
           <Users className="h-8 w-8 text-blue-500 mb-2" />
           <div className="text-2xl font-bold text-gray-900">{userCount || 0}</div>
-          <div className="text-sm text-gray-500">Total Users</div>
+          <div className="text-sm text-gray-500">Users</div>
         </Link>
         <Link 
           href="/admin/bookmarks"
@@ -111,7 +113,7 @@ export default async function AdminPage() {
         >
           <Bookmark className="h-8 w-8 text-primary-500 mb-2" />
           <div className="text-2xl font-bold text-gray-900">{bookmarkCount || 0}</div>
-          <div className="text-sm text-gray-500">Total Bookmarks</div>
+          <div className="text-sm text-gray-500">Bookmarks</div>
         </Link>
         <Link 
           href="/admin/tags"
@@ -119,7 +121,26 @@ export default async function AdminPage() {
         >
           <Tag className="h-8 w-8 text-green-500 mb-2" />
           <div className="text-2xl font-bold text-gray-900">{tagCount || 0}</div>
-          <div className="text-sm text-gray-500">Total Tags</div>
+          <div className="text-sm text-gray-500">Tags</div>
+        </Link>
+        <Link 
+          href="/admin/groups"
+          className={`bg-white border rounded-lg p-4 hover:shadow-sm transition-all ${
+            pendingGroupRelated > 0 
+              ? 'border-purple-300 bg-purple-50 hover:border-purple-400' 
+              : 'border-gray-200 hover:border-purple-300'
+          }`}
+        >
+          <div className="relative inline-block">
+            <FolderOpen className="h-8 w-8 text-purple-500 mb-2" />
+            {pendingGroupRelated > 0 && (
+              <span className="absolute -top-1 -right-2 bg-purple-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                {pendingGroupRelated}
+              </span>
+            )}
+          </div>
+          <div className="text-2xl font-bold text-gray-900">{groupCount || 0}</div>
+          <div className="text-sm text-gray-500">Groups</div>
         </Link>
         <Link 
           href="/admin/approvals"
@@ -131,13 +152,13 @@ export default async function AdminPage() {
         >
           <CheckSquare className={`h-8 w-8 mb-2 ${totalPendingApprovals > 0 ? 'text-amber-500' : 'text-gray-400'}`} />
           <div className="text-2xl font-bold text-gray-900">{totalPendingApprovals}</div>
-          <div className="text-sm text-gray-500">Pending Approvals</div>
+          <div className="text-sm text-gray-500">Approvals</div>
         </Link>
       </div>
 
       {/* Admin Sections */}
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Management</h2>
-      <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-6">
         <Link
           href="/admin/approvals"
           className={`bg-white border rounded-lg p-6 hover:shadow-sm transition-all ${
@@ -155,7 +176,7 @@ export default async function AdminPage() {
             )}
           </div>
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Approvals</h2>
-          <p className="text-gray-600 text-sm">Review submissions, memberships, and flags</p>
+          <p className="text-gray-600 text-sm">Review pending requests</p>
         </Link>
 
         <Link
@@ -164,7 +185,7 @@ export default async function AdminPage() {
         >
           <Users className="h-10 w-10 text-blue-500 mb-4" />
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Users</h2>
-          <p className="text-gray-600 text-sm">View, edit roles, and manage accounts</p>
+          <p className="text-gray-600 text-sm">Manage accounts & roles</p>
         </Link>
 
         <Link
@@ -173,7 +194,7 @@ export default async function AdminPage() {
         >
           <Bookmark className="h-10 w-10 text-primary-500 mb-4" />
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Bookmarks</h2>
-          <p className="text-gray-600 text-sm">Review and moderate bookmarks</p>
+          <p className="text-gray-600 text-sm">Edit & moderate links</p>
         </Link>
 
         <Link
@@ -182,27 +203,27 @@ export default async function AdminPage() {
         >
           <Tag className="h-10 w-10 text-green-500 mb-4" />
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Tags</h2>
-          <p className="text-gray-600 text-sm">Create, edit, and organize tags</p>
+          <p className="text-gray-600 text-sm">Organize & restrict tags</p>
         </Link>
 
         <Link
-          href="/admin/group-requests"
+          href="/admin/groups"
           className={`bg-white border rounded-lg p-6 hover:shadow-sm transition-all ${
-            (pendingGroupRequestsCount || 0) > 0 
+            pendingGroupRelated > 0 
               ? 'border-purple-300 hover:border-purple-400' 
               : 'border-gray-200 hover:border-purple-300'
           }`}
         >
           <div className="relative">
-            <FolderPlus className="h-10 w-10 text-purple-500 mb-4" />
-            {(pendingGroupRequestsCount || 0) > 0 && (
+            <FolderOpen className="h-10 w-10 text-purple-500 mb-4" />
+            {pendingGroupRelated > 0 && (
               <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                {pendingGroupRequestsCount}
+                {pendingGroupRelated}
               </span>
             )}
           </div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Group Requests</h2>
-          <p className="text-gray-600 text-sm">Review new group creation requests</p>
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Groups</h2>
+          <p className="text-gray-600 text-sm">Manage groups & members</p>
         </Link>
       </div>
     </div>
