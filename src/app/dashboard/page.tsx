@@ -12,11 +12,11 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // Fetch user's bookmarks
+  // Fetch user's bookmarks (using correct column name: creator_id)
   const { data: bookmarks } = await supabase
     .from('bookmarks')
     .select('*')
-    .eq('created_by', user.id)
+    .eq('creator_id', user.id)
     .order('created_at', { ascending: false })
     .limit(5)
 
