@@ -34,6 +34,7 @@ export function RestoreBookmarkButton({ bookmarkId }: RestoreBookmarkButtonProps
       onClick={handleRestore}
       disabled={loading}
       className="px-3 py-1 text-sm bg-green-50 text-green-600 rounded-lg hover:bg-green-100 flex items-center gap-1 disabled:opacity-50"
+      title="Restore this bookmark"
     >
       <RotateCcw className="h-3 w-3" />
       {loading ? 'Restoring...' : 'Restore'}
