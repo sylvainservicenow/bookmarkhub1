@@ -54,7 +54,7 @@ export function BookmarkCard({ bookmark, isFavorited = false, showFavorite = fal
             </p>
           )}
           
-          {/* Stats row: domain, rating, clicks */}
+          {/* Stats row: domain, rating, clicks, favorite */}
           <div className="flex items-center flex-wrap gap-3 mt-2 text-sm">
             {domain && (
               <Link 
@@ -65,24 +65,22 @@ export function BookmarkCard({ bookmark, isFavorited = false, showFavorite = fal
               </Link>
             )}
             
-            {avgRating !== null && (
-              <span className="flex items-center gap-1 text-amber-500">
-                <Star className="h-4 w-4 fill-current" />
-                {avgRating.toFixed(1)}
-                <span className="text-gray-400 text-xs">({ratings.length})</span>
-              </span>
-            )}
+            {/* Always show rating */}
+            <span className={`flex items-center gap-1 ${avgRating !== null ? 'text-amber-500' : 'text-gray-300'}`}>
+              <Star className={`h-4 w-4 ${avgRating !== null ? 'fill-current' : ''}`} />
+              {avgRating !== null ? avgRating.toFixed(1) : '-'}
+              <span className="text-gray-400 text-xs">({ratings.length})</span>
+            </span>
             
-            {clickCount > 0 && (
-              <span className="flex items-center gap-1 text-gray-400">
-                <MousePointerClick className="h-4 w-4" />
-                {clickCount}
-              </span>
-            )}
+            {/* Always show clicks */}
+            <span className="flex items-center gap-1 text-gray-400">
+              <MousePointerClick className="h-4 w-4" />
+              {clickCount}
+            </span>
           </div>
           
           {/* Tags */}
-          {tags.length > 0 && (
+          {tags.length > 0 ? (
             <div className="flex flex-wrap gap-1 mt-2">
               {tags.slice(0, 5).map((tag) => (
                 <Link
@@ -98,6 +96,10 @@ export function BookmarkCard({ bookmark, isFavorited = false, showFavorite = fal
                   +{tags.length - 5} more
                 </span>
               )}
+            </div>
+          ) : (
+            <div className="mt-2">
+              <span className="text-gray-300 text-xs">No tags</span>
             </div>
           )}
         </div>
