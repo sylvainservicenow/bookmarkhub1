@@ -6,8 +6,18 @@ import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { BookmarkIcon, User as UserIcon } from 'lucide-react'
 
+// Avatar mapping - must match settings page
+const AVATAR_MAP: Record<string, string> = {
+  cat: '🐱', dog: '🐶', fox: '🦊', panda: '🐼', koala: '🐨',
+  lion: '🦁', tiger: '🐯', bear: '🐻', rabbit: '🐰', owl: '🦉',
+  penguin: '🐧', butterfly: '🦋', dolphin: '🐬', unicorn: '🦄', dragon: '🐉',
+  rocket: '🚀', star: '⭐', sun: '🌞', moon: '🌙', rainbow: '🌈',
+  flower: '🌸', tree: '🌳', mountain: '🏔️', crystal: '💎', robot: '🤖',
+}
+
 export function Header() {
   const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<{ name: string | null; avatar_url: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -15,16 +25,43 @@ export function Header() {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
+      
+      if (user) {
+        // Fetch profile to get display name and avatar
+        const { data: profileData } = await supabase
+          .from('users')
+          .select('name, avatar_url')
+          .eq('id', user.id)
+          .single()
+        
+        setProfile(profileData)
+      }
+      
       setLoading(false)
     }
     getUser()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null)
+      
+      if (session?.user) {
+        const { data: profileData } = await supabase
+          .from('users')
+          .select('name, avatar_url')
+          .eq('id', session.user.id)
+          .single()
+        
+        setProfile(profileData)
+      } else {
+        setProfile(null)
+      }
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase.auth])
+  }, [supabase])
+
+  const displayName = profile?.name || user?.email?.split('@')[0] || ''
+  const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -45,11 +82,11 @@ export function Header() {
                 href="/dashboard"
                 className="flex items-center gap-2 text-gray-700 hover:text-gray-900"
               >
-                <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
-                  <UserIcon className="h-5 w-5 text-primary-600" />
+                <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-lg">
+                  {avatarEmoji || <UserIcon className="h-5 w-5 text-primary-600" />}
                 </div>
                 <span className="hidden sm:block text-sm font-medium">
-                  {user.email?.split('@')[0]}
+                  {displayName}
                 </span>
               </Link>
             ) : (
