@@ -150,7 +150,7 @@ export default function SubmitPage() {
       return
     }
 
-    // Create bookmark
+    // Create bookmark (without group_id - use junction table instead)
     const { data: bookmark, error: bookmarkError } = await supabase
       .from('bookmarks')
       .insert({
@@ -158,7 +158,6 @@ export default function SubmitPage() {
         title,
         description: description || null,
         visibility,
-        group_id: visibility === 'restricted' ? selectedGroupId : null,
         status: 'active',
         creator_id: user.id,
       })
@@ -169,6 +168,21 @@ export default function SubmitPage() {
       setError(bookmarkError.message)
       setLoading(false)
       return
+    }
+
+    // If restricted, add to bookmark_groups junction table
+    if (visibility === 'restricted' && selectedGroupId && bookmark) {
+      const { error: groupError } = await supabase
+        .from('bookmark_groups')
+        .insert({
+          bookmark_id: bookmark.id,
+          group_id: selectedGroupId,
+        })
+      
+      if (groupError) {
+        console.error('Error adding bookmark to group:', groupError)
+        // Don't fail the whole submission, bookmark is already created
+      }
     }
 
     // Add existing tags
