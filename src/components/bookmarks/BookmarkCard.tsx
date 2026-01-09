@@ -7,8 +7,7 @@ interface BookmarkCardProps {
     title: string
     url: string
     description: string | null
-    domain: string | null
-    bookmark_tags?: { tags: { name: string } }[]
+    bookmark_tags?: { tags: { name: string } | null }[]
     ratings?: { rating: number }[]
   }
 }
@@ -19,6 +18,12 @@ export function BookmarkCard({ bookmark }: BookmarkCardProps) {
     : null
 
   const tags = bookmark.bookmark_tags?.map(bt => bt.tags?.name).filter(Boolean) || []
+
+  // Extract domain from URL
+  let domain = ''
+  try {
+    domain = new URL(bookmark.url).hostname.replace('www.', '')
+  } catch {}
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -38,8 +43,8 @@ export function BookmarkCard({ bookmark }: BookmarkCardProps) {
           )}
           
           <div className="flex items-center gap-3 mt-2 text-sm">
-            {bookmark.domain && (
-              <span className="text-gray-500">{bookmark.domain}</span>
+            {domain && (
+              <span className="text-gray-500">{domain}</span>
             )}
             
             {avgRating !== null && (
@@ -55,7 +60,7 @@ export function BookmarkCard({ bookmark }: BookmarkCardProps) {
               {tags.slice(0, 5).map((tag) => (
                 <Link
                   key={tag}
-                  href={`/search?tag=${encodeURIComponent(tag)}`}
+                  href={`/search?tag=${encodeURIComponent(tag as string)}`}
                   className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full hover:bg-gray-200"
                 >
                   {tag}
