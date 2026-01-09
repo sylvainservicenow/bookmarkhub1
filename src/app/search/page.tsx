@@ -14,43 +14,66 @@ export default async function SearchPage({
   
   const supabase = await createClient()
   
-  let bookmarksQuery = supabase
-    .from('bookmarks')
-    .select(`
-      *,
-      bookmark_tags(tag_id, tags(name)),
-      ratings(rating)
-    `)
-    .eq('status', 'active')
-    .eq('is_public', true)
+  let bookmarks: any[] = []
   
-  if (query) {
-    bookmarksQuery = bookmarksQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+  // If searching by tag, we need a different approach
+  if (tag) {
+    const { data } = await supabase
+      .from('bookmarks')
+      .select(`
+        *,
+        bookmark_tags!inner(
+          tags!inner(id, name)
+        ),
+        ratings(rating)
+      `)
+      .eq('status', 'active')
+      .eq('visibility', 'public')
+      .ilike('bookmark_tags.tags.name', tag)
+      .limit(20)
+    
+    bookmarks = data || []
+  } else {
+    // Regular search
+    let bookmarksQuery = supabase
+      .from('bookmarks')
+      .select(`
+        *,
+        bookmark_tags(tag_id, tags(name)),
+        ratings(rating)
+      `)
+      .eq('status', 'active')
+      .eq('visibility', 'public')
+    
+    if (query) {
+      bookmarksQuery = bookmarksQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+    }
+    
+    if (domain) {
+      bookmarksQuery = bookmarksQuery.ilike('url', `%${domain}%`)
+    }
+    
+    const { data } = await bookmarksQuery.order('created_at', { ascending: false }).limit(20)
+    bookmarks = data || []
   }
-  
-  if (domain) {
-    bookmarksQuery = bookmarksQuery.ilike('domain', `%${domain}%`)
-  }
-  
-  const { data: bookmarks } = await bookmarksQuery.limit(20)
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <SearchBox />
+        <SearchBox initialQuery={query} />
       </div>
       
       {(query || tag || domain) && (
         <p className="text-gray-600 mb-6">
-          {bookmarks?.length || 0} results
-          {query && <span> for "{query}"</span>}
-          {tag && <span> tagged "{tag}"</span>}
+          {bookmarks.length} result{bookmarks.length !== 1 ? 's' : ''}
+          {query && <span> for &quot;{query}&quot;</span>}
+          {tag && <span> tagged &quot;{tag}&quot;</span>}
           {domain && <span> from {domain}</span>}
         </p>
       )}
 
       <div className="grid gap-4">
-        {bookmarks && bookmarks.length > 0 ? (
+        {bookmarks.length > 0 ? (
           bookmarks.map((bookmark: any) => (
             <BookmarkCard key={bookmark.id} bookmark={bookmark} />
           ))
