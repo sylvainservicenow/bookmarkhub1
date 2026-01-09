@@ -4,8 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 
-export function SearchBox() {
-  const [query, setQuery] = useState('')
+interface SearchBoxProps {
+  initialQuery?: string
+}
+
+export function SearchBox({ initialQuery = '' }: SearchBoxProps) {
+  const [query, setQuery] = useState(initialQuery)
   const router = useRouter()
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -16,7 +20,7 @@ export function SearchBox() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-2xl">
+    <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
       <div className="relative">
         <input
           type="text"
