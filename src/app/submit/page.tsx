@@ -38,11 +38,13 @@ export default function SubmitPage() {
     checkUser()
 
     const fetchTags = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('tags')
         .select('id, name, visibility')
         .eq('visibility', 'public')
+        .eq('status', 'active')
         .order('name')
+      console.log('Tags fetched:', data, 'Error:', error)
       if (data) setAvailableTags(data)
     }
     fetchTags()
@@ -229,7 +231,7 @@ export default function SubmitPage() {
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
               <Tag className="h-4 w-4" />
-              Tags
+              Tags ({availableTags.length} available)
             </label>
             <div className="flex flex-wrap gap-2">
               {availableTags.map(tag => (
@@ -247,7 +249,7 @@ export default function SubmitPage() {
                 </button>
               ))}
               {availableTags.length === 0 && (
-                <span className="text-gray-400 text-sm">No tags available</span>
+                <span className="text-gray-400 text-sm">Loading tags...</span>
               )}
             </div>
           </div>
