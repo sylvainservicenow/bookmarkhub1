@@ -10,6 +10,7 @@ export default async function SearchPage({
   searchParams: Promise<{ 
     q?: string
     tag?: string
+    tags?: string
     domain?: string
     sort?: string
     visibility?: string
@@ -18,9 +19,13 @@ export default async function SearchPage({
   const params = await searchParams
   const query = params.q || ''
   const tag = params.tag || ''
+  const tagsParam = params.tags || ''
   const domain = params.domain || ''
   const sort = params.sort || 'recent'
   const visibility = params.visibility || 'all'
+  
+  // Parse multiple tags
+  const selectedTags = tagsParam ? tagsParam.split(',').filter(Boolean) : (tag ? [tag] : [])
   
   const supabase = await createClient()
   
@@ -80,10 +85,8 @@ export default async function SearchPage({
   if (sort === 'popular') {
     bookmarksQuery = bookmarksQuery.order('click_count', { ascending: false })
   } else if (sort === 'rated') {
-    // We'll sort by rating after fetching
     bookmarksQuery = bookmarksQuery.order('created_at', { ascending: false })
   } else {
-    // Default: recent
     bookmarksQuery = bookmarksQuery.order('created_at', { ascending: false })
   }
   
@@ -95,11 +98,13 @@ export default async function SearchPage({
   
   bookmarks = data || []
   
-  // Filter by tag if specified (post-query since nested filter is tricky)
-  if (tag) {
+  // Filter by tags if specified (post-query since nested filter is tricky)
+  if (selectedTags.length > 0) {
     bookmarks = bookmarks.filter((b: any) => 
-      b.bookmark_tags?.some((bt: any) => 
-        bt.tags?.name?.toLowerCase() === tag.toLowerCase()
+      selectedTags.some(selectedTag =>
+        b.bookmark_tags?.some((bt: any) => 
+          bt.tags?.name?.toLowerCase() === selectedTag.toLowerCase()
+        )
       )
     )
   }
@@ -129,14 +134,16 @@ export default async function SearchPage({
       removeUrl: `${baseUrl}?${newParams.toString()}` 
     })
   }
-  if (tag) {
+  selectedTags.forEach(t => {
+    const newTags = selectedTags.filter(st => st !== t)
     const newParams = new URLSearchParams()
-    Object.entries(params).forEach(([k, v]) => { if (v && k !== 'tag') newParams.set(k, v) })
+    Object.entries(params).forEach(([k, v]) => { if (v && k !== 'tag' && k !== 'tags') newParams.set(k, v) })
+    if (newTags.length > 0) newParams.set('tags', newTags.join(','))
     activeFilters.push({ 
-      label: `Tag: ${tag}`, 
+      label: `Tag: ${t}`, 
       removeUrl: `${baseUrl}?${newParams.toString()}` 
     })
-  }
+  })
   if (domain) {
     const newParams = new URLSearchParams()
     Object.entries(params).forEach(([k, v]) => { if (v && k !== 'domain') newParams.set(k, v) })
@@ -145,6 +152,8 @@ export default async function SearchPage({
       removeUrl: `${baseUrl}?${newParams.toString()}` 
     })
   }
+
+  const hasFilters = query || selectedTags.length > 0 || domain || sort !== 'recent' || visibility !== 'all'
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -156,7 +165,7 @@ export default async function SearchPage({
       {/* Filters */}
       <SearchFilters 
         currentSort={sort}
-        currentTag={tag}
+        selectedTags={selectedTags}
         currentVisibility={visibility}
         tags={allTags || []}
         searchParams={params}
@@ -204,7 +213,15 @@ export default async function SearchPage({
           ))
         ) : (
           <div className="text-center py-12 text-gray-500">
-            No bookmarks found. Try adjusting your filters.
+            <p className="mb-2">No bookmarks found.</p>
+            {hasFilters && (
+              <Link 
+                href="/search" 
+                className="text-primary-600 hover:underline font-medium"
+              >
+                Clear all filters
+              </Link>
+            )}
           </div>
         )}
       </div>
