@@ -102,7 +102,7 @@ export default async function BookmarkPage({
             {/* Edit button for creator */}
             {isCreator && !isArchived && (
               <Link
-                href={`/my-bookmarks/${bookmark.id}/edit`}
+                href={`/bookmarks/${bookmark.id}/edit`}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 <Pencil className="h-4 w-4" />
