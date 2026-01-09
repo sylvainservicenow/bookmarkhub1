@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe } from 'lucide-react'
 
-interface Tag {
+interface TagType {
   id: string
   name: string
-  is_public: boolean
+  visibility: string
 }
 
 export default function SubmitPage() {
@@ -16,7 +16,7 @@ export default function SubmitPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [availableTags, setAvailableTags] = useState<Tag[]>([])
+  const [availableTags, setAvailableTags] = useState<TagType[]>([])
   const [isPublic, setIsPublic] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -40,22 +40,13 @@ export default function SubmitPage() {
     const fetchTags = async () => {
       const { data } = await supabase
         .from('tags')
-        .select('id, name, is_public')
-        .eq('is_public', true)
+        .select('id, name, visibility')
+        .eq('visibility', 'public')
         .order('name')
       if (data) setAvailableTags(data)
     }
     fetchTags()
   }, [supabase, router])
-
-  const extractDomain = (url: string): string => {
-    try {
-      const urlObj = new URL(url)
-      return urlObj.hostname.replace('www.', '')
-    } catch {
-      return ''
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,8 +68,6 @@ export default function SubmitPage() {
       return
     }
 
-    const domain = extractDomain(url)
-
     // Check if URL already exists
     const { data: existing } = await supabase
       .from('bookmarks')
@@ -92,17 +81,16 @@ export default function SubmitPage() {
       return
     }
 
-    // Create bookmark
+    // Create bookmark with correct column names
     const { data: bookmark, error: bookmarkError } = await supabase
       .from('bookmarks')
       .insert({
         url,
         title,
         description: description || null,
-        domain,
-        is_public: isPublic,
+        visibility: isPublic ? 'public' : 'restricted',
         status: 'active',
-        created_by: user.id,
+        creator_id: user.id,
       })
       .select()
       .single()
@@ -287,7 +275,7 @@ export default function SubmitPage() {
                   onChange={() => setIsPublic(false)}
                   className="text-primary-600 focus:ring-primary-500"
                 />
-                <span className="text-sm text-gray-700">Private</span>
+                <span className="text-sm text-gray-700">Restricted</span>
               </label>
             </div>
           </div>
