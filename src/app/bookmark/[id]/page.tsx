@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ExternalLink, Star, ArrowLeft, Calendar, User, Globe } from 'lucide-react'
+import { ExternalLink, Star, ArrowLeft, Calendar, User, Globe, Archive } from 'lucide-react'
 import { FavoriteButton } from '@/components/bookmarks/FavoriteButton'
 
 export default async function BookmarkPage({
@@ -18,7 +18,7 @@ export default async function BookmarkPage({
       *,
       users:creator_id (name, email),
       bookmark_tags (
-        tags (id, name)
+        tags (id, name, status)
       ),
       ratings (rating, user_id)
     `)
@@ -29,7 +29,11 @@ export default async function BookmarkPage({
     notFound()
   }
 
-  const tags = bookmark.bookmark_tags?.map((bt: any) => bt.tags).filter(Boolean) || []
+  // Filter to only show active tags
+  const tags = bookmark.bookmark_tags
+    ?.map((bt: any) => bt.tags)
+    .filter((tag: any) => tag && tag.status === 'active') || []
+  
   const ratings = bookmark.ratings || []
   const avgRating = ratings.length > 0
     ? ratings.reduce((sum: number, r: any) => sum + r.rating, 0) / ratings.length
@@ -40,6 +44,8 @@ export default async function BookmarkPage({
   try {
     domain = new URL(bookmark.url).hostname.replace('www.', '')
   } catch {}
+
+  const isArchived = bookmark.status === 'archived'
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -52,13 +58,21 @@ export default async function BookmarkPage({
         Back to Dashboard
       </Link>
 
+      {/* Archived banner */}
+      {isArchived && (
+        <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-amber-700">
+          <Archive className="h-5 w-5" />
+          <span>This bookmark has been archived</span>
+        </div>
+      )}
+
       {/* Main content */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className={`bg-white border border-gray-200 rounded-lg p-6 ${isArchived ? 'opacity-75' : ''}`}>
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-4">
           <h1 className="text-2xl font-bold text-gray-900">{bookmark.title}</h1>
           <div className="flex items-center gap-2 shrink-0">
-            <FavoriteButton bookmarkId={bookmark.id} />
+            {!isArchived && <FavoriteButton bookmarkId={bookmark.id} />}
             <a
               href={bookmark.url}
               target="_blank"
@@ -136,8 +150,8 @@ export default async function BookmarkPage({
           )}
         </div>
 
-        {/* Visibility badge */}
-        <div className="mt-4">
+        {/* Status badges */}
+        <div className="mt-4 flex gap-2">
           <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
             bookmark.visibility === 'public' 
               ? 'bg-green-100 text-green-700' 
@@ -145,6 +159,11 @@ export default async function BookmarkPage({
           }`}>
             {bookmark.visibility}
           </span>
+          {isArchived && (
+            <span className="inline-flex px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
+              archived
+            </span>
+          )}
         </div>
       </div>
     </div>

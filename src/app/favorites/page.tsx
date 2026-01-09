@@ -13,12 +13,13 @@ export default async function FavoritesPage() {
     redirect('/login?redirect=/favorites')
   }
 
+  // Only get favorites for active bookmarks
   const { data: favorites } = await supabase
     .from('favorites')
     .select(`
       id,
       created_at,
-      bookmarks (
+      bookmarks!inner (
         id,
         title,
         url,
@@ -27,12 +28,13 @@ export default async function FavoritesPage() {
         status,
         created_at,
         bookmark_tags (
-          tags (id, name)
+          tags (id, name, status)
         ),
         ratings (rating)
       )
     `)
     .eq('user_id', user.id)
+    .eq('bookmarks.status', 'active')
     .order('created_at', { ascending: false })
 
   const bookmarks = favorites

@@ -12,19 +12,21 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // Fetch user's bookmarks (using correct column name: creator_id)
+  // Fetch user's active bookmarks
   const { data: bookmarks } = await supabase
     .from('bookmarks')
     .select('*')
     .eq('creator_id', user.id)
+    .eq('status', 'active')
     .order('created_at', { ascending: false })
     .limit(5)
 
-  // Fetch user's favorites
+  // Fetch user's favorites (only active bookmarks)
   const { data: favorites } = await supabase
     .from('favorites')
-    .select('bookmark_id, bookmarks(*)')
+    .select('bookmark_id, bookmarks!inner(*)')
     .eq('user_id', user.id)
+    .eq('bookmarks.status', 'active')
     .limit(5)
 
   return (
