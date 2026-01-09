@@ -151,7 +151,7 @@ export default function SubmitPage() {
       await supabase.from('bookmark_tags').insert(tagInserts)
     }
 
-    // Create and add custom tags
+    // Create and add custom tags (using created_by for tags table)
     if (customTags.length > 0 && bookmark) {
       for (const tagName of customTags) {
         // Create the new tag
@@ -161,7 +161,7 @@ export default function SubmitPage() {
             name: tagName,
             visibility: 'public',
             status: 'active',
-            creator_id: user.id,
+            created_by: user.id,
           })
           .select()
           .single()
