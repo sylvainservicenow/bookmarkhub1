@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ExternalLink, ArrowLeft, Calendar, User, Globe, Archive, MessageSquare } from 'lucide-react'
+import { ExternalLink, ArrowLeft, Calendar, User, Globe, Archive, MessageSquare, Pencil } from 'lucide-react'
 import { FavoriteButton } from '@/components/bookmarks/FavoriteButton'
 import { RatingStars } from '@/components/bookmarks/RatingStars'
 import { CommentForm } from '@/components/comments/CommentForm'
@@ -46,6 +46,9 @@ export default async function BookmarkPage({
   if (error || !bookmark) {
     notFound()
   }
+
+  // Check if current user is the creator
+  const isCreator = user && bookmark.creator_id === user.id
 
   // Filter to only show active tags
   const tags = bookmark.bookmark_tags
@@ -96,6 +99,16 @@ export default async function BookmarkPage({
           <h1 className="text-2xl font-bold text-gray-900">{bookmark.title}</h1>
           <div className="flex items-center gap-2 shrink-0">
             {!isArchived && <FavoriteButton bookmarkId={bookmark.id} />}
+            {/* Edit button for creator */}
+            {isCreator && !isArchived && (
+              <Link
+                href={`/my-bookmarks/${bookmark.id}/edit`}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Link>
+            )}
             <a
               href={bookmark.url}
               target="_blank"
@@ -177,6 +190,7 @@ export default async function BookmarkPage({
             <div className="flex items-center gap-2">
               <User className="h-4 w-4" />
               {bookmark.users.name || bookmark.users.email?.split('@')[0]}
+              {isCreator && <span className="text-primary-600">(you)</span>}
             </div>
           )}
         </div>
