@@ -1,5 +1,6 @@
 import { SearchBox } from '@/components/search/SearchBox'
 import { TopStats } from '@/components/home/TopStats'
+import { SubmitBookmarkButton } from '@/components/home/SubmitBookmarkButton'
 
 export default function HomePage() {
   return (
@@ -14,6 +15,11 @@ export default function HomePage() {
         </p>
         
         <SearchBox />
+        
+        {/* Submit Bookmark CTA */}
+        <div className="mt-6">
+          <SubmitBookmarkButton />
+        </div>
       </section>
 
       {/* Stats Section */}
