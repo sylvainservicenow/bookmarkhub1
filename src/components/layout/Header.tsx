@@ -22,32 +22,47 @@ export function Header() {
 
   useEffect(() => {
     const supabase = createClient()
+    let mounted = true
     
     const getUser = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        
+        if (!mounted) return
+        
+        if (authError || !user) {
+          setUser(null)
+          setProfile(null)
+          setLoading(false)
+          return
+        }
+        
         setUser(user)
         
-        if (user) {
-          // Fetch profile to get display name and avatar
-          const { data: profileData } = await supabase
-            .from('users')
-            .select('name, avatar_url')
-            .eq('id', user.id)
-            .single()
-          
+        // Fetch profile to get display name and avatar
+        const { data: profileData } = await supabase
+          .from('users')
+          .select('name, avatar_url')
+          .eq('id', user.id)
+          .single()
+        
+        if (mounted) {
           setProfile(profileData)
         }
       } catch (error) {
         console.error('Error fetching user:', error)
       } finally {
-        setLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
     
     getUser()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return
+      
       setUser(session?.user ?? null)
       
       if (session?.user) {
@@ -57,13 +72,18 @@ export function Header() {
           .eq('id', session.user.id)
           .single()
         
-        setProfile(profileData)
+        if (mounted) {
+          setProfile(profileData)
+        }
       } else {
         setProfile(null)
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const displayName = profile?.name || user?.email?.split('@')[0] || ''
