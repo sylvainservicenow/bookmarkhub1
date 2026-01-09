@@ -19,26 +19,32 @@ export function Header() {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<{ name: string | null; avatar_url: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
 
   useEffect(() => {
+    const supabase = createClient()
+    
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      
-      if (user) {
-        // Fetch profile to get display name and avatar
-        const { data: profileData } = await supabase
-          .from('users')
-          .select('name, avatar_url')
-          .eq('id', user.id)
-          .single()
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
         
-        setProfile(profileData)
+        if (user) {
+          // Fetch profile to get display name and avatar
+          const { data: profileData } = await supabase
+            .from('users')
+            .select('name, avatar_url')
+            .eq('id', user.id)
+            .single()
+          
+          setProfile(profileData)
+        }
+      } catch (error) {
+        console.error('Error fetching user:', error)
+      } finally {
+        setLoading(false)
       }
-      
-      setLoading(false)
     }
+    
     getUser()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -58,7 +64,7 @@ export function Header() {
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase])
+  }, [])
 
   const displayName = profile?.name || user?.email?.split('@')[0] || ''
   const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
