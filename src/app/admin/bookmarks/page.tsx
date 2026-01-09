@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, Bookmark, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Bookmark, ExternalLink, Pencil } from 'lucide-react'
 import { BookmarkStatusSelect } from '@/components/admin/BookmarkStatusSelect'
 
 export default async function AdminBookmarksPage() {
@@ -94,14 +94,24 @@ export default async function AdminBookmarksPage() {
                   {new Date(b.created_at).toLocaleDateString()}
                 </td>
                 <td className="px-4 py-3">
-                  <a
-                    href={b.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-gray-400 hover:text-primary-600"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/admin/bookmarks/${b.id}/edit`}
+                      className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded"
+                      title="Edit bookmark"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Link>
+                    <a
+                      href={b.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded"
+                      title="Open URL"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, Tag, Plus } from 'lucide-react'
+import { ArrowLeft, Tag, Plus, Settings } from 'lucide-react'
 import { TagStatusSelect } from '@/components/admin/TagStatusSelect'
 import { CreateTagForm } from '@/components/admin/CreateTagForm'
 
@@ -25,12 +25,13 @@ export default async function AdminTagsPage() {
     redirect('/dashboard')
   }
 
-  // Get all tags with usage count
+  // Get all tags with usage count and group associations
   const { data: tags } = await supabase
     .from('tags')
     .select(`
       *,
-      bookmark_tags (count)
+      bookmark_tags (count),
+      tag_groups (group_id, groups(name))
     `)
     .order('name', { ascending: true })
 
@@ -76,39 +77,63 @@ export default async function AdminTagsPage() {
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Tag Name</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Usage</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Visibility</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Groups</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Status</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Created</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {tags?.map((tag: any) => (
-              <tr key={tag.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/search?tag=${encodeURIComponent(tag.name)}`}
-                    className="font-medium text-gray-900 hover:text-primary-600"
-                  >
-                    {tag.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-gray-600 text-sm">
-                  {tag.bookmark_tags?.[0]?.count || 0} bookmarks
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    tag.visibility === 'public' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {tag.visibility}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <TagStatusSelect tagId={tag.id} currentStatus={tag.status} />
-                </td>
-                <td className="px-4 py-3 text-gray-500 text-sm">
-                  {new Date(tag.created_at).toLocaleDateString()}
-                </td>
-              </tr>
-            ))}
+            {tags?.map((tag: any) => {
+              const groups = tag.tag_groups?.map((tg: any) => tg.groups?.name).filter(Boolean) || []
+              return (
+                <tr key={tag.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <span className="font-medium text-gray-900">
+                      {tag.name}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 text-sm">
+                    {tag.bookmark_tags?.[0]?.count || 0} bookmarks
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      tag.visibility === 'public' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {tag.visibility}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {tag.visibility === 'restricted' ? (
+                      groups.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {groups.map((name: string, i: number) => (
+                            <span key={i} className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-red-500">No group assigned</span>
+                      )
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <TagStatusSelect tagId={tag.id} currentStatus={tag.status} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/admin/tags/${tag.id}/edit`}
+                      className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded inline-flex"
+                      title="Edit tag"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Link>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
