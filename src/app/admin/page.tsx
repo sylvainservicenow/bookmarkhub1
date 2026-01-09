@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, Users, Bookmark, Tag, Shield, Clock } from 'lucide-react'
+import { ArrowLeft, Users, Bookmark, Tag, Shield, Clock, FolderPlus } from 'lucide-react'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -41,6 +41,11 @@ export default async function AdminPage() {
     .select('*', { count: 'exact', head: true })
     .eq('status', 'pending')
 
+  const { count: pendingGroupRequestsCount } = await supabase
+    .from('group_creation_requests')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'pending')
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       {/* Header */}
@@ -59,13 +64,13 @@ export default async function AdminPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
-            <p className="text-gray-600">Manage users, bookmarks, and tags</p>
+            <p className="text-gray-600">Manage users, bookmarks, tags, and groups</p>
           </div>
         </div>
       </div>
 
       {/* Stats - Now Clickable */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
         <Link 
           href="/admin/users"
           className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition-all"
@@ -98,10 +103,22 @@ export default async function AdminPage() {
           <div className="text-2xl font-bold text-gray-900">{pendingCount || 0}</div>
           <div className="text-sm text-gray-500">Pending Review</div>
         </Link>
+        <Link 
+          href="/admin/group-requests"
+          className={`bg-white border rounded-lg p-4 hover:shadow-sm transition-all ${
+            (pendingGroupRequestsCount || 0) > 0 
+              ? 'border-purple-300 bg-purple-50 hover:border-purple-400' 
+              : 'border-gray-200 hover:border-purple-300'
+          }`}
+        >
+          <FolderPlus className="h-8 w-8 text-purple-500 mb-2" />
+          <div className="text-2xl font-bold text-gray-900">{pendingGroupRequestsCount || 0}</div>
+          <div className="text-sm text-gray-500">Group Requests</div>
+        </Link>
       </div>
 
       {/* Admin Sections */}
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-4 gap-6">
         <Link
           href="/admin/users"
           className="bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-sm transition-all"
@@ -127,6 +144,26 @@ export default async function AdminPage() {
           <Tag className="h-10 w-10 text-green-500 mb-4" />
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Manage Tags</h2>
           <p className="text-gray-600 text-sm">Create, edit, and organize tags</p>
+        </Link>
+
+        <Link
+          href="/admin/group-requests"
+          className={`bg-white border rounded-lg p-6 hover:shadow-sm transition-all ${
+            (pendingGroupRequestsCount || 0) > 0 
+              ? 'border-purple-300 hover:border-purple-400' 
+              : 'border-gray-200 hover:border-purple-300'
+          }`}
+        >
+          <div className="relative">
+            <FolderPlus className="h-10 w-10 text-purple-500 mb-4" />
+            {(pendingGroupRequestsCount || 0) > 0 && (
+              <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                {pendingGroupRequestsCount}
+              </span>
+            )}
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Group Requests</h2>
+          <p className="text-gray-600 text-sm">Review requests to create new groups</p>
         </Link>
       </div>
     </div>
