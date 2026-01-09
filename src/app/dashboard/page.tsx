@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { LogOut, Plus, Bookmark, Heart, User, Search, ExternalLink, Calendar, Mail, Edit, Archive } from 'lucide-react'
+import { LogOut, Plus, Bookmark, Heart, User, Search, ExternalLink, Calendar, Mail, Edit, Archive, Shield } from 'lucide-react'
 
 // Avatar mapping - must match settings page
 const AVATAR_MAP: Record<string, string> = {
@@ -69,6 +69,7 @@ export default async function DashboardPage() {
 
   const displayName = profile?.name || user.email?.split('@')[0]
   const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
+  const isAdmin = profile?.role === 'admin'
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -79,7 +80,14 @@ export default async function DashboardPage() {
             {avatarEmoji || <User className="h-8 w-8 text-primary-600" />}
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
+              {isAdmin && (
+                <span className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                  Admin
+                </span>
+              )}
+            </div>
             <p className="text-gray-500 text-sm flex items-center gap-1">
               <Mail className="h-3 w-3" />
               {user.email}
@@ -91,6 +99,15 @@ export default async function DashboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="flex items-center gap-2 px-3 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <Shield className="h-4 w-4" />
+              Admin Panel
+            </Link>
+          )}
           <Link
             href="/settings"
             className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
