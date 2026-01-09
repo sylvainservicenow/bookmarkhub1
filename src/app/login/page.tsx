@@ -26,46 +26,57 @@ function LoginForm() {
     setResendSuccess(false)
     setLoading(true)
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (signInError) {
-      setError(signInError.message)
-      // Show resend option if email not confirmed
-      if (signInError.message.toLowerCase().includes('email not confirmed')) {
-        setShowResendOption(true)
+      if (signInError) {
+        setError(signInError.message)
+        if (signInError.message.toLowerCase().includes('email not confirmed')) {
+          setShowResendOption(true)
+        }
+        setLoading(false)
+        return
       }
+
+      // Check if user account is active
+      if (data.user) {
+        try {
+          const { data: profile } = await supabase
+            .from('users')
+            .select('status')
+            .eq('id', data.user.id)
+            .single()
+
+          if (profile?.status === 'suspended') {
+            await supabase.auth.signOut()
+            setError('Your account has been suspended. Please contact an administrator.')
+            setLoading(false)
+            return
+          }
+
+          if (profile?.status === 'archived') {
+            await supabase.auth.signOut()
+            setError('Your account has been archived. Please contact an administrator to restore it.')
+            setLoading(false)
+            return
+          }
+        } catch (profileError) {
+          // If profile check fails, still allow login (profile might not exist yet)
+          console.error('Profile check failed:', profileError)
+        }
+      }
+
+      // Redirect to dashboard
+      router.push(redirect)
+      router.refresh()
+    } catch (err) {
+      console.error('Login error:', err)
+      setError('An unexpected error occurred. Please try again.')
       setLoading(false)
-      return
     }
-
-    // Check if user account is active
-    if (data.user) {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('status')
-        .eq('id', data.user.id)
-        .single()
-
-      if (profile?.status === 'suspended') {
-        await supabase.auth.signOut()
-        setError('Your account has been suspended. Please contact an administrator.')
-        setLoading(false)
-        return
-      }
-
-      if (profile?.status === 'archived') {
-        await supabase.auth.signOut()
-        setError('Your account has been archived. Please contact an administrator to restore it.')
-        setLoading(false)
-        return
-      }
-    }
-
-    router.push(redirect)
-    router.refresh()
   }
 
   const handleResendConfirmation = async () => {
@@ -77,16 +88,20 @@ function LoginForm() {
     setResendLoading(true)
     setError(null)
 
-    const { error: resendError } = await supabase.auth.resend({
-      type: 'signup',
-      email,
-    })
+    try {
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      })
 
-    if (resendError) {
-      setError(resendError.message)
-    } else {
-      setResendSuccess(true)
-      setShowResendOption(false)
+      if (resendError) {
+        setError(resendError.message)
+      } else {
+        setResendSuccess(true)
+        setShowResendOption(false)
+      }
+    } catch (err) {
+      setError('Failed to resend confirmation email')
     }
 
     setResendLoading(false)
