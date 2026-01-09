@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Plus, X } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Plus, X, Check } from 'lucide-react'
 
 interface TagType {
   id: string
@@ -291,72 +291,94 @@ export default function SubmitPage() {
             />
           </div>
 
-          {/* Tags */}
+          {/* Tags Section */}
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
               <Tag className="h-4 w-4" />
               Tags
+              {(selectedTags.length > 0 || customTags.length > 0) && (
+                <span className="text-primary-600">
+                  ({selectedTags.length + customTags.length} selected)
+                </span>
+              )}
             </label>
             
-            {/* Existing tags */}
-            <div className="flex flex-wrap gap-2 mb-3">
-              {availableTags.map(tag => (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => toggleTag(tag.id)}
-                  className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                    selectedTags.includes(tag.id)
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {tag.name}
-                </button>
-              ))}
+            {/* Select existing tags */}
+            <div className="mb-4">
+              <p className="text-xs text-gray-500 mb-2">Select from existing tags:</p>
+              <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg max-h-40 overflow-y-auto">
+                {availableTags.length > 0 ? (
+                  availableTags.map(tag => {
+                    const isSelected = selectedTags.includes(tag.id)
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => toggleTag(tag.id)}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm transition-colors ${
+                          isSelected
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-white border border-gray-300 text-gray-700 hover:border-primary-400 hover:text-primary-600'
+                        }`}
+                      >
+                        {tag.name}
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </button>
+                    )
+                  })
+                ) : (
+                  <span className="text-gray-400 text-sm">No tags available</span>
+                )}
+              </div>
             </div>
 
             {/* Custom tags display */}
             {customTags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3">
-                {customTags.map(tag => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm"
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveCustomTag(tag)}
-                      className="hover:text-green-900"
+              <div className="mb-4">
+                <p className="text-xs text-gray-500 mb-2">New tags to create:</p>
+                <div className="flex flex-wrap gap-2">
+                  {customTags.map(tag => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm"
                     >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCustomTag(tag)}
+                        className="hover:text-green-900"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
 
             {/* Add new tag input */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Add a new tag..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
-              />
-              <button
-                type="button"
-                onClick={handleAddCustomTag}
-                disabled={!newTagName.trim()}
-                className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Or create a new tag:</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type a new tag name..."
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCustomTag}
+                  disabled={!newTagName.trim()}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Press Enter or click + to add</p>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Press Enter or click + to add a new tag</p>
           </div>
 
           {/* Visibility */}
