@@ -3,12 +3,17 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Plus, X, Check } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Plus, X, Check, FolderOpen, Lock } from 'lucide-react'
 
 interface TagType {
   id: string
   name: string
   visibility: string
+}
+
+interface GroupType {
+  id: string
+  name: string
 }
 
 export default function SubmitPage() {
@@ -19,7 +24,9 @@ export default function SubmitPage() {
   const [availableTags, setAvailableTags] = useState<TagType[]>([])
   const [newTagName, setNewTagName] = useState('')
   const [customTags, setCustomTags] = useState<string[]>([])
-  const [isPublic, setIsPublic] = useState(true)
+  const [visibility, setVisibility] = useState<'public' | 'restricted'>('public')
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+  const [userGroups, setUserGroups] = useState<GroupType[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -36,6 +43,20 @@ export default function SubmitPage() {
         return
       }
       setUser(user)
+      
+      // Fetch user's groups
+      const { data: memberships } = await supabase
+        .from('group_members')
+        .select('group_id, groups(id, name, status)')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+      
+      if (memberships) {
+        const groups = memberships
+          .map((m: any) => m.groups)
+          .filter((g: any) => g && g.status === 'active')
+        setUserGroups(groups)
+      }
     }
     checkUser()
 
@@ -109,6 +130,13 @@ export default function SubmitPage() {
       return
     }
 
+    // Validate restricted requires group
+    if (visibility === 'restricted' && !selectedGroupId) {
+      setError('Please select a group for restricted bookmarks')
+      setLoading(false)
+      return
+    }
+
     // Check if URL already exists
     const { data: existing } = await supabase
       .from('bookmarks')
@@ -129,7 +157,8 @@ export default function SubmitPage() {
         url,
         title,
         description: description || null,
-        visibility: isPublic ? 'public' : 'restricted',
+        visibility,
+        group_id: visibility === 'restricted' ? selectedGroupId : null,
         status: 'active',
         creator_id: user.id,
       })
@@ -208,6 +237,8 @@ export default function SubmitPage() {
                 setDescription('')
                 setSelectedTags([])
                 setCustomTags([])
+                setVisibility('public')
+                setSelectedGroupId(null)
               }}
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
             >
@@ -387,12 +418,15 @@ export default function SubmitPage() {
               <Globe className="h-4 w-4" />
               Visibility
             </label>
-            <div className="flex gap-4">
+            <div className="flex gap-4 mb-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
-                  checked={isPublic}
-                  onChange={() => setIsPublic(true)}
+                  checked={visibility === 'public'}
+                  onChange={() => {
+                    setVisibility('public')
+                    setSelectedGroupId(null)
+                  }}
                   className="text-primary-600 focus:ring-primary-500"
                 />
                 <span className="text-sm text-gray-700">Public</span>
@@ -400,19 +434,56 @@ export default function SubmitPage() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
-                  checked={!isPublic}
-                  onChange={() => setIsPublic(false)}
+                  checked={visibility === 'restricted'}
+                  onChange={() => setVisibility('restricted')}
                   className="text-primary-600 focus:ring-primary-500"
                 />
                 <span className="text-sm text-gray-700">Restricted</span>
               </label>
             </div>
+            
+            {/* Group selection for restricted */}
+            {visibility === 'restricted' && (
+              <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <label className="flex items-center gap-2 text-sm font-medium text-amber-800 mb-2">
+                  <Lock className="h-4 w-4" />
+                  Select a group *
+                </label>
+                {userGroups.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {userGroups.map(group => (
+                      <button
+                        key={group.id}
+                        type="button"
+                        onClick={() => setSelectedGroupId(group.id)}
+                        className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                          selectedGroupId === group.id
+                            ? 'bg-amber-600 text-white'
+                            : 'bg-white border border-amber-300 text-amber-800 hover:border-amber-500'
+                        }`}
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                        {group.name}
+                        {selectedGroupId === group.id && <Check className="h-3 w-3" />}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-amber-700 text-sm">
+                    You are not a member of any groups yet.{' '}
+                    <a href="/groups" className="underline hover:text-amber-900">
+                      Browse groups to join
+                    </a>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Submit */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (visibility === 'restricted' && !selectedGroupId)}
             className="w-full py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Submitting...' : 'Submit Bookmark'}
