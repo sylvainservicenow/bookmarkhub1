@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ExternalLink, ArrowLeft, Calendar, User, Globe, Archive, MessageSquare, Pencil } from 'lucide-react'
+import { ArrowLeft, Calendar, User, Globe, Archive, MessageSquare, Pencil, MousePointer } from 'lucide-react'
 import { FavoriteButton } from '@/components/bookmarks/FavoriteButton'
 import { RatingStars } from '@/components/bookmarks/RatingStars'
+import { VisitButton } from '@/components/bookmarks/VisitButton'
 import { CommentForm } from '@/components/comments/CommentForm'
 import { CommentList } from '@/components/comments/CommentList'
 
@@ -109,15 +110,13 @@ export default async function BookmarkPage({
                 Edit
               </Link>
             )}
-            <a
-              href={bookmark.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-            >
-              <ExternalLink className="h-4 w-4" />
-              Visit
-            </a>
+            {!isArchived && (
+              <VisitButton 
+                bookmarkId={bookmark.id} 
+                url={bookmark.url} 
+                clickCount={bookmark.click_count || 0}
+              />
+            )}
           </div>
         </div>
 
@@ -175,11 +174,10 @@ export default async function BookmarkPage({
             </Link>
           )}
 
-          {bookmark.click_count > 0 && (
-            <div className="flex items-center gap-2">
-              {bookmark.click_count} clicks
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <MousePointer className="h-4 w-4" />
+            {bookmark.click_count || 0} clicks
+          </div>
 
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
