@@ -1,7 +1,16 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { LogOut, Plus, Bookmark, Heart, Settings, User, Search, ExternalLink, Calendar, Mail, Edit, Archive } from 'lucide-react'
+import { LogOut, Plus, Bookmark, Heart, User, Search, ExternalLink, Calendar, Mail, Edit, Archive } from 'lucide-react'
+
+// Avatar mapping - must match settings page
+const AVATAR_MAP: Record<string, string> = {
+  cat: '🐱', dog: '🐶', fox: '🦊', panda: '🐼', koala: '🐨',
+  lion: '🦁', tiger: '🐯', bear: '🐻', rabbit: '🐰', owl: '🦉',
+  penguin: '🐧', butterfly: '🦋', dolphin: '🐬', unicorn: '🦄', dragon: '🐉',
+  rocket: '🚀', star: '⭐', sun: '🌞', moon: '🌙', rainbow: '🌈',
+  flower: '🌸', tree: '🌳', mountain: '🏔️', crystal: '💎', robot: '🤖',
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -59,23 +68,16 @@ export default async function DashboardPage() {
     .limit(5)
 
   const displayName = profile?.name || user.email?.split('@')[0]
+  const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div className="flex items-center gap-4">
-          {profile?.avatar_url ? (
-            <img 
-              src={profile.avatar_url} 
-              alt={displayName}
-              className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center">
-              <User className="h-8 w-8 text-primary-600" />
-            </div>
-          )}
+          <div className="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center text-4xl border-2 border-primary-200">
+            {avatarEmoji || <User className="h-8 w-8 text-primary-600" />}
+          </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{displayName}</h1>
             <p className="text-gray-500 text-sm flex items-center gap-1">
