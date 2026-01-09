@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Bookmark, ArrowLeft, Plus } from 'lucide-react'
+import { Bookmark, ArrowLeft, Plus, Archive } from 'lucide-react'
 import { BookmarkCard } from '@/components/bookmarks/BookmarkCard'
-import { DeleteBookmarkButton } from '@/components/bookmarks/DeleteBookmarkButton'
+import { ArchiveBookmarkButton } from '@/components/bookmarks/ArchiveBookmarkButton'
+import { RestoreBookmarkButton } from '@/components/bookmarks/RestoreBookmarkButton'
 
 export default async function MyBookmarksPage() {
   const supabase = await createClient()
@@ -14,7 +15,8 @@ export default async function MyBookmarksPage() {
     redirect('/login?redirect=/bookmarks')
   }
 
-  const { data: bookmarks } = await supabase
+  // Get active bookmarks
+  const { data: activeBookmarks } = await supabase
     .from('bookmarks')
     .select(`
       *,
@@ -24,6 +26,21 @@ export default async function MyBookmarksPage() {
       ratings (rating)
     `)
     .eq('creator_id', user.id)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+
+  // Get archived bookmarks
+  const { data: archivedBookmarks } = await supabase
+    .from('bookmarks')
+    .select(`
+      *,
+      bookmark_tags (
+        tags (id, name)
+      ),
+      ratings (rating)
+    `)
+    .eq('creator_id', user.id)
+    .eq('status', 'archived')
     .order('created_at', { ascending: false })
 
   return (
@@ -45,7 +62,10 @@ export default async function MyBookmarksPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">My Bookmarks</h1>
-              <p className="text-gray-600">{bookmarks?.length || 0} bookmark{bookmarks?.length !== 1 ? 's' : ''} created</p>
+              <p className="text-gray-600">
+                {activeBookmarks?.length || 0} active
+                {archivedBookmarks && archivedBookmarks.length > 0 && ` · ${archivedBookmarks.length} archived`}
+              </p>
             </div>
           </div>
           
@@ -59,10 +79,10 @@ export default async function MyBookmarksPage() {
         </div>
       </div>
 
-      {/* Bookmarks list */}
+      {/* Active Bookmarks */}
       <div className="space-y-4">
-        {bookmarks && bookmarks.length > 0 ? (
-          bookmarks.map((bookmark: any) => (
+        {activeBookmarks && activeBookmarks.length > 0 ? (
+          activeBookmarks.map((bookmark: any) => (
             <div key={bookmark.id} className="relative">
               <BookmarkCard bookmark={bookmark} />
               <div className="absolute top-4 right-14 flex gap-2">
@@ -72,7 +92,7 @@ export default async function MyBookmarksPage() {
                 >
                   Edit
                 </Link>
-                <DeleteBookmarkButton bookmarkId={bookmark.id} />
+                <ArchiveBookmarkButton bookmarkId={bookmark.id} />
               </div>
             </div>
           ))
@@ -93,6 +113,26 @@ export default async function MyBookmarksPage() {
           </div>
         )}
       </div>
+
+      {/* Archived Bookmarks */}
+      {archivedBookmarks && archivedBookmarks.length > 0 && (
+        <div className="mt-12">
+          <div className="flex items-center gap-2 mb-4">
+            <Archive className="h-5 w-5 text-gray-400" />
+            <h2 className="text-lg font-medium text-gray-600">Archived</h2>
+          </div>
+          <div className="space-y-4 opacity-75">
+            {archivedBookmarks.map((bookmark: any) => (
+              <div key={bookmark.id} className="relative">
+                <BookmarkCard bookmark={bookmark} />
+                <div className="absolute top-4 right-14 flex gap-2">
+                  <RestoreBookmarkButton bookmarkId={bookmark.id} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
