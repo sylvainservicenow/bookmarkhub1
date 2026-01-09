@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { ExternalLink, Star, ArrowLeft, Calendar, User, Globe } from 'lucide-react'
+import { FavoriteButton } from '@/components/bookmarks/FavoriteButton'
 
 export default async function BookmarkPage({
   params,
@@ -56,15 +57,18 @@ export default async function BookmarkPage({
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-4">
           <h1 className="text-2xl font-bold text-gray-900">{bookmark.title}</h1>
-          <a
-            href={bookmark.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shrink-0"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Visit
-          </a>
+          <div className="flex items-center gap-2 shrink-0">
+            <FavoriteButton bookmarkId={bookmark.id} />
+            <a
+              href={bookmark.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Visit
+            </a>
+          </div>
         </div>
 
         {/* URL */}
