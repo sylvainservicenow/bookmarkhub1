@@ -1,9 +1,11 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ExternalLink, ArrowLeft, Calendar, User, Globe, Archive } from 'lucide-react'
+import { ExternalLink, ArrowLeft, Calendar, User, Globe, Archive, MessageSquare } from 'lucide-react'
 import { FavoriteButton } from '@/components/bookmarks/FavoriteButton'
 import { RatingStars } from '@/components/bookmarks/RatingStars'
+import { CommentForm } from '@/components/comments/CommentForm'
+import { CommentList } from '@/components/comments/CommentList'
 
 export default async function BookmarkPage({
   params,
@@ -13,6 +15,20 @@ export default async function BookmarkPage({
   const { id } = await params
   const supabase = await createClient()
 
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  // Check if user is admin
+  let isAdmin = false
+  if (user) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    isAdmin = profile?.role === 'admin'
+  }
+
   const { data: bookmark, error } = await supabase
     .from('bookmarks')
     .select(`
@@ -21,7 +37,8 @@ export default async function BookmarkPage({
       bookmark_tags (
         tags (id, name, status)
       ),
-      ratings (rating, user_id)
+      ratings (rating, user_id),
+      comments (id, author_id, author_name, content, created_at, status)
     `)
     .eq('id', id)
     .single()
@@ -39,6 +56,11 @@ export default async function BookmarkPage({
   const avgRating = ratings.length > 0
     ? ratings.reduce((sum: number, r: any) => sum + r.rating, 0) / ratings.length
     : 0
+
+  // Filter to only show active comments, sorted by date
+  const comments = (bookmark.comments || [])
+    .filter((c: any) => c.status === 'active')
+    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   // Extract domain from URL
   let domain = ''
@@ -175,6 +197,39 @@ export default async function BookmarkPage({
           )}
         </div>
       </div>
+
+      {/* Comments Section */}
+      {!isArchived && (
+        <div className="mt-6 bg-white border border-gray-200 rounded-lg p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-primary-600" />
+            Comments ({comments.length})
+          </h2>
+          
+          {/* Comment Form */}
+          {user ? (
+            <div className="mb-6">
+              <CommentForm bookmarkId={bookmark.id} />
+            </div>
+          ) : (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg text-center">
+              <p className="text-gray-600 text-sm">
+                <Link href={`/login?redirect=/bookmark/${bookmark.id}`} className="text-primary-600 hover:underline">
+                  Log in
+                </Link>
+                {' '}to leave a comment
+              </p>
+            </div>
+          )}
+          
+          {/* Comments List */}
+          <CommentList 
+            comments={comments} 
+            currentUserId={user?.id}
+            isAdmin={isAdmin}
+          />
+        </div>
+      )}
     </div>
   )
 }
