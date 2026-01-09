@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ExternalLink, Star, MousePointerClick, Heart } from 'lucide-react'
+import { BookmarkFavicon } from './BookmarkFavicon'
 
 interface BookmarkCardProps {
   bookmark: {
@@ -7,6 +8,7 @@ interface BookmarkCardProps {
     title: string
     url: string
     description: string | null
+    favicon_url?: string | null
     click_count?: number
     bookmark_tags?: { tags: { id?: string; name: string } | null }[]
     ratings?: { rating: number }[]
@@ -34,8 +36,13 @@ export function BookmarkCard({ bookmark, isFavorited = false, showFavorite = fal
     <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          {/* Title row with favorite indicator */}
+          {/* Title row with favicon and favorite indicator */}
           <div className="flex items-center gap-2">
+            <BookmarkFavicon 
+              faviconUrl={bookmark.favicon_url || null} 
+              title={bookmark.title} 
+              size="sm" 
+            />
             <Link
               href={`/bookmark/${bookmark.id}`}
               className="text-lg font-medium text-gray-900 hover:text-primary-600 line-clamp-1"
