@@ -73,7 +73,7 @@ export async function TopStats() {
       {/* Overall Stats - Clickable */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         <Link 
-          href="/search"
+          href="/groups"
           className="bg-white rounded-lg p-4 text-center border border-gray-200 hover:border-green-300 hover:shadow-sm transition-all"
         >
           <FolderOpen className="h-6 w-6 text-green-500 mx-auto mb-2" />
@@ -81,7 +81,7 @@ export async function TopStats() {
           <div className="text-sm text-gray-500">Groups</div>
         </Link>
         <Link 
-          href="/search"
+          href="/tags"
           className="bg-white rounded-lg p-4 text-center border border-gray-200 hover:border-amber-300 hover:shadow-sm transition-all"
         >
           <Tag className="h-6 w-6 text-amber-500 mx-auto mb-2" />
