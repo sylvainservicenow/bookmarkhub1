@@ -18,7 +18,10 @@ export function VisitButton({ bookmarkId, url, clickCount: initialClickCount }: 
     // Optimistically update the UI
     setClickCount(prev => prev + 1)
 
-    // Track the click in the database
+    // Open the URL in a new tab immediately (don't wait for DB)
+    window.open(url, '_blank', 'noopener,noreferrer')
+
+    // Track the click in the database (fire and forget)
     try {
       // Get current user (optional - clicks can be anonymous)
       const { data: { user } } = await supabase.auth.getUser()
@@ -31,15 +34,12 @@ export function VisitButton({ bookmarkId, url, clickCount: initialClickCount }: 
         referrer: document.referrer || null,
       })
 
-      // Increment click_count on the bookmark
-      await supabase.rpc('increment_click_count', { bookmark_id: bookmarkId })
+      // Increment click_count on the bookmark using correct parameter name
+      await supabase.rpc('increment_click_count', { p_bookmark_id: bookmarkId })
     } catch (error) {
       console.error('Error tracking click:', error)
-      // Don't block the navigation even if tracking fails
+      // Don't block - tracking is best effort
     }
-
-    // Open the URL in a new tab
-    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   return (
