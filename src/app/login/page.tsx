@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { BookmarkIcon } from 'lucide-react'
@@ -12,6 +12,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirect = searchParams.get('redirect') || '/dashboard'
   const supabase = createClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,18 +21,44 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
-    if (error) {
-      setError(error.message)
+    if (signInError) {
+      setError(signInError.message)
       setLoading(false)
-    } else {
-      router.push('/dashboard')
-      router.refresh()
+      return
     }
+
+    // Check if user account is active
+    if (data.user) {
+      const { data: profile } = await supabase
+        .from('users')
+        .select('status')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profile?.status === 'suspended') {
+        // Sign out the user
+        await supabase.auth.signOut()
+        setError('Your account has been suspended. Please contact an administrator.')
+        setLoading(false)
+        return
+      }
+
+      if (profile?.status === 'archived') {
+        // Sign out the user
+        await supabase.auth.signOut()
+        setError('Your account has been archived. Please contact an administrator to restore it.')
+        setLoading(false)
+        return
+      }
+    }
+
+    router.push(redirect)
+    router.refresh()
   }
 
   return (
