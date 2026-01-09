@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Plus, X } from 'lucide-react'
 
 interface TagType {
   id: string
@@ -17,6 +17,8 @@ export default function SubmitPage() {
   const [description, setDescription] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [availableTags, setAvailableTags] = useState<TagType[]>([])
+  const [newTagName, setNewTagName] = useState('')
+  const [customTags, setCustomTags] = useState<string[]>([])
   const [isPublic, setIsPublic] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -38,17 +40,54 @@ export default function SubmitPage() {
     checkUser()
 
     const fetchTags = async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('tags')
         .select('id, name, visibility')
         .eq('visibility', 'public')
         .eq('status', 'active')
         .order('name')
-      console.log('Tags fetched:', data, 'Error:', error)
       if (data) setAvailableTags(data)
     }
     fetchTags()
   }, [supabase, router])
+
+  const handleAddCustomTag = () => {
+    const trimmedTag = newTagName.trim()
+    if (!trimmedTag) return
+    
+    // Check if tag already exists in available tags
+    const existingTag = availableTags.find(
+      t => t.name.toLowerCase() === trimmedTag.toLowerCase()
+    )
+    if (existingTag) {
+      // Select the existing tag instead
+      if (!selectedTags.includes(existingTag.id)) {
+        setSelectedTags(prev => [...prev, existingTag.id])
+      }
+      setNewTagName('')
+      return
+    }
+    
+    // Check if already in custom tags
+    if (customTags.some(t => t.toLowerCase() === trimmedTag.toLowerCase())) {
+      setNewTagName('')
+      return
+    }
+    
+    setCustomTags(prev => [...prev, trimmedTag])
+    setNewTagName('')
+  }
+
+  const handleRemoveCustomTag = (tagToRemove: string) => {
+    setCustomTags(prev => prev.filter(t => t !== tagToRemove))
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleAddCustomTag()
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,7 +122,7 @@ export default function SubmitPage() {
       return
     }
 
-    // Create bookmark with correct column names
+    // Create bookmark
     const { data: bookmark, error: bookmarkError } = await supabase
       .from('bookmarks')
       .insert({
@@ -103,14 +142,38 @@ export default function SubmitPage() {
       return
     }
 
-    // Add tags
+    // Add existing tags
     if (selectedTags.length > 0 && bookmark) {
       const tagInserts = selectedTags.map(tagId => ({
         bookmark_id: bookmark.id,
         tag_id: tagId,
       }))
-      
       await supabase.from('bookmark_tags').insert(tagInserts)
+    }
+
+    // Create and add custom tags
+    if (customTags.length > 0 && bookmark) {
+      for (const tagName of customTags) {
+        // Create the new tag
+        const { data: newTag } = await supabase
+          .from('tags')
+          .insert({
+            name: tagName,
+            visibility: 'public',
+            status: 'active',
+            creator_id: user.id,
+          })
+          .select()
+          .single()
+
+        // Link tag to bookmark
+        if (newTag) {
+          await supabase.from('bookmark_tags').insert({
+            bookmark_id: bookmark.id,
+            tag_id: newTag.id,
+          })
+        }
+      }
     }
 
     setSuccess(true)
@@ -144,6 +207,7 @@ export default function SubmitPage() {
                 setTitle('')
                 setDescription('')
                 setSelectedTags([])
+                setCustomTags([])
               }}
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
             >
@@ -231,9 +295,11 @@ export default function SubmitPage() {
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
               <Tag className="h-4 w-4" />
-              Tags ({availableTags.length} available)
+              Tags
             </label>
-            <div className="flex flex-wrap gap-2">
+            
+            {/* Existing tags */}
+            <div className="flex flex-wrap gap-2 mb-3">
               {availableTags.map(tag => (
                 <button
                   key={tag.id}
@@ -248,10 +314,49 @@ export default function SubmitPage() {
                   {tag.name}
                 </button>
               ))}
-              {availableTags.length === 0 && (
-                <span className="text-gray-400 text-sm">Loading tags...</span>
-              )}
             </div>
+
+            {/* Custom tags display */}
+            {customTags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {customTags.map(tag => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCustomTag(tag)}
+                      className="hover:text-green-900"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Add new tag input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Add a new tag..."
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
+              />
+              <button
+                type="button"
+                onClick={handleAddCustomTag}
+                disabled={!newTagName.trim()}
+                className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Press Enter or click + to add a new tag</p>
           </div>
 
           {/* Visibility */}
