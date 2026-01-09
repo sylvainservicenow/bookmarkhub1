@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, FolderOpen, Users, Lock, Globe } from 'lucide-react'
+import { ArrowLeft, FolderOpen, Users, Lock, Globe, Plus } from 'lucide-react'
 import { RequestJoinButton } from '@/components/groups/RequestJoinButton'
+import { RequestNewGroupButton } from '@/components/groups/RequestNewGroupButton'
 
 export default async function GroupsPage() {
   const supabase = await createClient()
@@ -38,14 +39,19 @@ export default async function GroupsPage() {
         Back to Home
       </Link>
       
-      <div className="flex items-center gap-3 mb-8">
-        <div className="p-2 bg-green-100 rounded-lg">
-          <FolderOpen className="h-6 w-6 text-green-600" />
+      <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-green-100 rounded-lg">
+            <FolderOpen className="h-6 w-6 text-green-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Groups</h1>
+            <p className="text-gray-600">Browse and join bookmark groups</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Groups</h1>
-          <p className="text-gray-600">Browse and join bookmark groups</p>
-        </div>
+        
+        {/* Request New Group button (only for logged in users) */}
+        {user && <RequestNewGroupButton />}
       </div>
       
       {groups && groups.length > 0 ? (
@@ -115,6 +121,11 @@ export default async function GroupsPage() {
         <div className="text-center py-12 text-gray-500">
           <FolderOpen className="h-12 w-12 mx-auto mb-4 text-gray-300" />
           <p>No groups available yet.</p>
+          {user && (
+            <p className="mt-2 text-sm">
+              Be the first to request a new group!
+            </p>
+          )}
         </div>
       )}
     </div>
