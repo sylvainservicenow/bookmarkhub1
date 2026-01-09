@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { BookmarkIcon, User as UserIcon } from 'lucide-react'
@@ -19,72 +19,44 @@ export function Header() {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<{ name: string | null; avatar_url: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [supabase] = useState(() => createClient())
+
+  const fetchProfile = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('users')
+      .select('name, avatar_url')
+      .eq('id', userId)
+      .single()
+    return data
+  }, [supabase])
 
   useEffect(() => {
-    const supabase = createClient()
-    let mounted = true
-    
-    const getUser = async () => {
-      try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        
-        if (!mounted) return
-        
-        if (authError || !user) {
-          setUser(null)
-          setProfile(null)
-          setLoading(false)
-          return
-        }
-        
-        setUser(user)
-        
-        // Fetch profile to get display name and avatar
-        const { data: profileData } = await supabase
-          .from('users')
-          .select('name, avatar_url')
-          .eq('id', user.id)
-          .single()
-        
-        if (mounted) {
-          setProfile(profileData)
-        }
-      } catch (error) {
-        console.error('Error fetching user:', error)
-      } finally {
-        if (mounted) {
-          setLoading(false)
-        }
-      }
-    }
-    
-    getUser()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return
-      
+    // Get initial session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setUser(session?.user ?? null)
       
       if (session?.user) {
-        const { data: profileData } = await supabase
-          .from('users')
-          .select('name, avatar_url')
-          .eq('id', session.user.id)
-          .single()
-        
-        if (mounted) {
-          setProfile(profileData)
-        }
+        const profileData = await fetchProfile(session.user.id)
+        setProfile(profileData)
+      }
+      
+      setLoading(false)
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setUser(session?.user ?? null)
+      
+      if (session?.user) {
+        const profileData = await fetchProfile(session.user.id)
+        setProfile(profileData)
       } else {
         setProfile(null)
       }
     })
 
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
-    }
-  }, [])
+    return () => subscription.unsubscribe()
+  }, [supabase, fetchProfile])
 
   const displayName = profile?.name || user?.email?.split('@')[0] || ''
   const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
