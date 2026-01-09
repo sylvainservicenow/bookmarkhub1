@@ -62,7 +62,7 @@ export default async function SearchPage({
   } else if (visibility === 'private' && user) {
     bookmarksQuery = bookmarksQuery.eq('visibility', 'private').eq('creator_id', user.id)
   } else {
-    // Default: show only public bookmarks (simpler approach)
+    // Default: show only public bookmarks
     bookmarksQuery = bookmarksQuery.eq('visibility', 'public')
   }
   
