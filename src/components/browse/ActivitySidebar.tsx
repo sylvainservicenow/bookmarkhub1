@@ -1,14 +1,23 @@
 import Link from 'next/link'
 import { Clock, Tag, TrendingUp, Star } from 'lucide-react'
 
+interface ActivityItem {
+  id: string
+  title: string
+  created_at: string
+  users?: { id: string; name: string | null } | { id: string; name: string | null }[] | null
+}
+
 interface ActivitySidebarProps {
-  recentActivity: {
-    id: string
-    title: string
-    created_at: string
-    users?: { id: string; name: string | null } | null
-  }[]
+  recentActivity: ActivityItem[]
   popularTags: string[]
+}
+
+// Helper to extract user from potentially array or object
+function getUser(users: ActivityItem['users']): { id: string; name: string | null } | null {
+  if (!users) return null
+  if (Array.isArray(users)) return users[0] || null
+  return users
 }
 
 export function ActivitySidebar({ recentActivity, popularTags }: ActivitySidebarProps) {
@@ -23,7 +32,8 @@ export function ActivitySidebar({ recentActivity, popularTags }: ActivitySidebar
         
         <div className="space-y-4">
           {recentActivity.map((item, index) => {
-            const userName = item.users?.name || 'Anonymous'
+            const user = getUser(item.users)
+            const userName = user?.name || 'Anonymous'
             const initial = userName.charAt(0).toUpperCase()
             const timeAgo = getTimeAgo(item.created_at)
             
