@@ -1,13 +1,17 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { DM_Sans } from 'next/font/google'
 import './globals.css'
 import { Header } from '@/components/layout/Header'
 
-const inter = Inter({ subsets: ['latin'] })
+const dmSans = DM_Sans({ 
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-dm-sans',
+})
 
 export const metadata: Metadata = {
-  title: 'Bookmark Hub',
-  description: 'A collaborative bookmark sharing platform',
+  title: 'BookmarkHub - Discover & Share the Best Bookmarks',
+  description: 'Find curated bookmarks from teams worldwide. Browse by popularity, explore categories, and save your favorites.',
 }
 
 export default function RootLayout({
@@ -17,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${dmSans.className} antialiased`}>
         <Header />
         <main>{children}</main>
       </body>
