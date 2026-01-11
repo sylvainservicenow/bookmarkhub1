@@ -4,7 +4,7 @@ import { Sparkles } from 'lucide-react'
 
 export function HeroSection() {
   return (
-    <section className="bg-warm-gradient bg-hero-pattern">
+    <section className="bg-hero-gradient bg-hero-pattern">
       <div className="max-w-4xl mx-auto px-4 py-16 md:py-24">
         {/* Badge */}
         <div className="flex justify-center mb-6">
