@@ -43,12 +43,21 @@ export function Header() {
   useEffect(() => {
     let mounted = true
     
+    // Timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('Auth check timed out, assuming not logged in')
+        setLoading(false)
+      }
+    }, 5000) // 5 second timeout
+    
     // Get initial session
     const initAuth = async () => {
       try {
         const { data: { user: currentUser }, error } = await supabase.auth.getUser()
         
-        if (error) {
+        // AuthSessionMissingError is expected when not logged in - don't log it
+        if (error && error.name !== 'AuthSessionMissingError') {
           console.error('Session error:', error)
         }
         
@@ -91,9 +100,10 @@ export function Header() {
 
     return () => {
       mounted = false
+      clearTimeout(timeout)
       subscription.unsubscribe()
     }
-  }, [supabase, fetchProfile])
+  }, [supabase, fetchProfile, loading])
 
   const displayName = profile?.name || user?.email?.split('@')[0] || ''
   const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
