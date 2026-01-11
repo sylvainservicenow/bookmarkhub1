@@ -113,7 +113,7 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <BookmarkIcon className="h-7 w-7 text-primary-500" />
             <span className="text-xl font-bold text-gray-900">BookmarkHub</span>
           </Link>
@@ -130,7 +130,7 @@ export function Header() {
                 {/* Add Bookmark Button */}
                 <Link
                   href="/submit"
-                  className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 active:bg-primary-700 transition-colors text-sm font-medium shadow-sm hover:shadow"
                 >
                   <Plus className="h-4 w-4" />
                   <span className="hidden sm:inline">Add Bookmark</span>
@@ -139,9 +139,9 @@ export function Header() {
                 {/* User Menu */}
                 <Link
                   href="/dashboard"
-                  className="flex items-center gap-2 text-gray-700 hover:text-gray-900"
+                  className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
                 >
-                  <div className="h-9 w-9 rounded-full bg-primary-100 flex items-center justify-center text-lg">
+                  <div className="h-9 w-9 rounded-full bg-primary-100 flex items-center justify-center text-lg transition-transform hover:scale-105">
                     {avatarEmoji || <UserIcon className="h-5 w-5 text-primary-600" />}
                   </div>
                   <span className="hidden sm:block text-sm font-medium">
@@ -153,13 +153,13 @@ export function Header() {
               <div className="flex items-center gap-2">
                 <Link
                   href="/login"
-                  className="text-sm font-medium text-gray-700 hover:text-gray-900 px-3 py-2"
+                  className="text-sm font-medium text-gray-700 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                   Log in
                 </Link>
                 <Link
                   href="/register"
-                  className="text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 px-4 py-2 rounded-lg transition-colors"
+                  className="text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 active:bg-primary-700 px-4 py-2 rounded-lg transition-colors shadow-sm hover:shadow"
                 >
                   Sign up
                 </Link>

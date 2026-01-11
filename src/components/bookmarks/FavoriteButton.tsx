@@ -1,19 +1,22 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Heart, Loader2 } from 'lucide-react'
 import { User } from '@supabase/supabase-js'
 
 interface FavoriteButtonProps {
   bookmarkId: string
+  initialFavorited?: boolean
 }
 
-export function FavoriteButton({ bookmarkId }: FavoriteButtonProps) {
-  const [isFavorited, setIsFavorited] = useState(false)
-  const [loading, setLoading] = useState(true)
+export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonProps) {
+  const [isFavorited, setIsFavorited] = useState(initialFavorited ?? false)
+  const [loading, setLoading] = useState(!initialFavorited)
   const [user, setUser] = useState<User | null>(null)
   const [supabase] = useState(() => createClient())
+  const [isAnimating, setIsAnimating] = useState(false)
+  const previousState = useRef(isFavorited)
 
   const checkFavoriteStatus = useCallback(async (userId: string) => {
     const { data } = await supabase
@@ -33,7 +36,7 @@ export function FavoriteButton({ bookmarkId }: FavoriteButtonProps) {
       try {
         const { data: { user: currentUser }, error } = await supabase.auth.getUser()
         
-        if (error) {
+        if (error && error.name !== 'AuthSessionMissingError') {
           console.error('FavoriteButton auth error:', error)
         }
         
@@ -55,7 +58,6 @@ export function FavoriteButton({ bookmarkId }: FavoriteButtonProps) {
     
     initAuth()
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return
       
@@ -80,31 +82,44 @@ export function FavoriteButton({ bookmarkId }: FavoriteButtonProps) {
       return
     }
 
-    setLoading(true)
+    // Store previous state for rollback
+    previousState.current = isFavorited
+    
+    // OPTIMISTIC UPDATE - Update UI immediately
+    const newState = !isFavorited
+    setIsFavorited(newState)
+    
+    // Trigger animation when favoriting
+    if (newState) {
+      setIsAnimating(true)
+      setTimeout(() => setIsAnimating(false), 300)
+    }
 
     try {
-      if (isFavorited) {
-        await supabase
+      if (previousState.current) {
+        // Was favorited, now removing
+        const { error } = await supabase
           .from('favorites')
           .delete()
           .eq('user_id', user.id)
           .eq('bookmark_id', bookmarkId)
         
-        setIsFavorited(false)
+        if (error) throw error
       } else {
-        await supabase
+        // Was not favorited, now adding
+        const { error } = await supabase
           .from('favorites')
           .insert({
             user_id: user.id,
             bookmark_id: bookmarkId,
           })
         
-        setIsFavorited(true)
+        if (error) throw error
       }
     } catch (err) {
+      // ROLLBACK on error
       console.error('Toggle favorite error:', err)
-    } finally {
-      setLoading(false)
+      setIsFavorited(previousState.current)
     }
   }
 
@@ -112,17 +127,21 @@ export function FavoriteButton({ bookmarkId }: FavoriteButtonProps) {
     <button
       onClick={toggleFavorite}
       disabled={loading}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-150 ${
         isFavorited
-          ? 'bg-red-50 text-red-600 hover:bg-red-100'
-          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-      } disabled:opacity-50`}
+          ? 'bg-red-50 text-red-600 hover:bg-red-100 active:bg-red-200'
+          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 active:bg-gray-300'
+      } disabled:opacity-50 disabled:cursor-not-allowed`}
       title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
     >
       {loading ? (
         <Loader2 className="h-4 w-4 animate-spin" />
       ) : (
-        <Heart className={`h-4 w-4 ${isFavorited ? 'fill-current' : ''}`} />
+        <Heart 
+          className={`h-4 w-4 transition-all duration-150 ${
+            isFavorited ? 'fill-current' : ''
+          } ${isAnimating ? 'heart-pop' : ''}`} 
+        />
       )}
       {isFavorited ? 'Favorited' : 'Favorite'}
     </button>

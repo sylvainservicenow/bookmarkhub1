@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import { DM_Sans } from 'next/font/google'
+import { Suspense } from 'react'
 import './globals.css'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
+import { NavigationProgress } from '@/components/layout/NavigationProgress'
 
 const dmSans = DM_Sans({ 
   subsets: ['latin'],
@@ -23,8 +25,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${dmSans.className} antialiased`}>
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
         <Header />
-        <main>{children}</main>
+        <main className="animate-fade-in">{children}</main>
         <Footer />
       </body>
     </html>

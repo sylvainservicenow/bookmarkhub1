@@ -31,7 +31,7 @@ export function BookmarkCard({ bookmark, isFavorited = false, showFavorite = fal
   } catch {}
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+    <div className="group bg-white border border-gray-200 rounded-lg p-4 transition-all duration-200 hover:shadow-md hover:border-gray-300 hover:-translate-y-0.5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {/* Title row with favicon and favorite indicator */}
@@ -43,7 +43,7 @@ export function BookmarkCard({ bookmark, isFavorited = false, showFavorite = fal
             />
             <Link
               href={`/bookmark/${bookmark.id}`}
-              className="text-lg font-medium text-gray-900 hover:text-primary-600 line-clamp-1"
+              className="text-lg font-medium text-gray-900 hover:text-primary-600 line-clamp-1 transition-colors"
             >
               {bookmark.title}
             </Link>
@@ -64,7 +64,7 @@ export function BookmarkCard({ bookmark, isFavorited = false, showFavorite = fal
             {domain && (
               <Link 
                 href={`/search?domain=${encodeURIComponent(domain)}`}
-                className="text-gray-500 hover:text-primary-600"
+                className="text-gray-500 hover:text-primary-600 transition-colors"
               >
                 {domain}
               </Link>
@@ -85,7 +85,7 @@ export function BookmarkCard({ bookmark, isFavorited = false, showFavorite = fal
                 <Link
                   key={tag}
                   href={`/search?tag=${encodeURIComponent(tag as string)}`}
-                  className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full hover:bg-primary-100 hover:text-primary-700"
+                  className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full hover:bg-primary-100 hover:text-primary-700 transition-colors"
                 >
                   {tag}
                 </Link>
@@ -108,7 +108,7 @@ export function BookmarkCard({ bookmark, isFavorited = false, showFavorite = fal
           href={bookmark.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="p-2 text-gray-400 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
+          className="p-2 text-gray-400 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-all shrink-0 opacity-70 group-hover:opacity-100"
           title="Open in new tab"
         >
           <ExternalLink className="h-5 w-5" />

@@ -1,93 +1,101 @@
-import { createClient } from '@/lib/supabase/server'
-import Link from 'next/link'
-import { Tag, Palette, Code, Zap, MessageCircle, TrendingUp } from 'lucide-react'
+'use client'
 
-// Map category names to icons and emojis
-const CATEGORY_CONFIG: Record<string, { icon: React.ReactNode; emoji: string }> = {
-  'All': { icon: <Tag className="h-4 w-4" />, emoji: '🏷️' },
-  'Design': { icon: <Palette className="h-4 w-4" />, emoji: '🎨' },
-  'Development': { icon: <Code className="h-4 w-4" />, emoji: '💻' },
-  'Productivity': { icon: <Zap className="h-4 w-4" />, emoji: '⚡' },
-  'Communication': { icon: <MessageCircle className="h-4 w-4" />, emoji: '💬' },
-  'Marketing': { icon: <TrendingUp className="h-4 w-4" />, emoji: '📈' },
+import Link from 'next/link'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { Tag, Loader2, ChevronRight } from 'lucide-react'
+
+interface TagWithCount {
+  id: string
+  name: string
+  count: number
 }
 
-export async function CategoryPills() {
-  const supabase = await createClient()
-  
-  // Get all active tags with bookmark counts
-  const { data: tags } = await supabase
-    .from('tags')
-    .select('id, name')
-    .eq('status', 'active')
-    .order('name')
-  
-  // Get total bookmark count
-  const { count: totalCount } = await supabase
-    .from('bookmarks')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'active')
-    .eq('visibility', 'public')
-  
-  // Get bookmark counts per tag
-  const { data: tagCounts } = await supabase
-    .from('bookmark_tags')
-    .select('tag_id, bookmarks!inner(id, status, visibility)')
-    .eq('bookmarks.status', 'active')
-    .eq('bookmarks.visibility', 'public')
-  
-  // Count bookmarks per tag
-  const countByTag: Record<string, number> = {}
-  tagCounts?.forEach((item: any) => {
-    countByTag[item.tag_id] = (countByTag[item.tag_id] || 0) + 1
-  })
-  
-  // Build categories with counts
-  const categories = [
-    { name: 'All', count: totalCount || 0, href: '/browse' },
-    ...(tags || []).slice(0, 5).map(tag => ({
-      name: tag.name,
-      count: countByTag[tag.id] || 0,
-      href: `/browse?tag=${encodeURIComponent(tag.name)}`,
-    })),
-  ]
+export function CategoryPills() {
+  const [tags, setTags] = useState<TagWithCount[]>([])
+  const [loading, setLoading] = useState(true)
+  const [supabase] = useState(() => createClient())
+
+  useEffect(() => {
+    async function fetchTags() {
+      try {
+        // First get all tags
+        const { data: tagsData, error: tagsError } = await supabase
+          .from('tags')
+          .select('id, name')
+          .order('name')
+
+        if (tagsError) throw tagsError
+
+        // Then count bookmarks for each tag
+        const tagsWithCounts = await Promise.all(
+          (tagsData || []).map(async (tag) => {
+            const { count } = await supabase
+              .from('bookmark_tags')
+              .select('*', { count: 'exact', head: true })
+              .eq('tag_id', tag.id)
+
+            return {
+              ...tag,
+              count: count || 0
+            }
+          })
+        )
+
+        // Sort by count and take top 12
+        const sortedTags = tagsWithCounts
+          .filter(t => t.count > 0)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 12)
+
+        setTags(sortedTags)
+      } catch (err) {
+        console.error('Error fetching tags:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchTags()
+  }, [supabase])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-4">
+        <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+      </div>
+    )
+  }
+
+  if (tags.length === 0) {
+    return null
+  }
 
   return (
-    <section className="border-y border-gray-200 bg-white">
-      <div className="max-w-7xl mx-auto px-4 py-4">
-        <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide">
-          {categories.map((category, index) => {
-            const config = CATEGORY_CONFIG[category.name] || { emoji: '📁' }
-            const isAll = category.name === 'All'
-            
-            return (
-              <Link
-                key={category.name}
-                href={category.href}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
-                  ${isAll 
-                    ? 'bg-primary-500 text-white' 
-                    : 'bg-white border border-gray-200 text-gray-700 hover:border-primary-300 hover:bg-primary-50'
-                  }
-                `}
-              >
-                <span>{config.emoji}</span>
-                <span>{category.name}</span>
-                <span className={`
-                  px-2 py-0.5 rounded-full text-xs
-                  ${isAll 
-                    ? 'bg-white/20 text-white' 
-                    : 'bg-gray-100 text-gray-600'
-                  }
-                `}>
-                  {category.count}
-                </span>
-              </Link>
-            )
-          })}
-        </div>
-      </div>
-    </section>
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-sm text-gray-500 mr-1 flex items-center gap-1">
+        <Tag className="h-4 w-4" />
+        Popular:
+      </span>
+      {tags.map((tag) => (
+        <Link
+          key={tag.id}
+          href={`/search?tag=${encodeURIComponent(tag.name)}`}
+          className="group inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-sm text-gray-700 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 transition-all duration-150 hover:shadow-sm active:scale-95"
+        >
+          {tag.name}
+          <span className="text-xs text-gray-400 group-hover:text-primary-500 transition-colors">
+            {tag.count}
+          </span>
+        </Link>
+      ))}
+      <Link
+        href="/tags"
+        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
+      >
+        All tags
+        <ChevronRight className="h-4 w-4" />
+      </Link>
+    </div>
   )
 }
