@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Tag, Loader2, ChevronRight } from 'lucide-react'
 
@@ -15,8 +15,11 @@ export function CategoryPills() {
   const [tags, setTags] = useState<TagWithCount[]>([])
   const [loading, setLoading] = useState(true)
   const [supabase] = useState(() => createClient())
+  const mountedRef = useRef(true)
 
   useEffect(() => {
+    mountedRef.current = true
+    
     async function fetchTags() {
       try {
         // First get all tags
@@ -26,10 +29,13 @@ export function CategoryPills() {
           .order('name')
 
         if (tagsError) throw tagsError
+        if (!mountedRef.current) return
 
         // Then count bookmarks for each tag
         const tagsWithCounts = await Promise.all(
           (tagsData || []).map(async (tag) => {
+            if (!mountedRef.current) return { ...tag, count: 0 }
+            
             const { count } = await supabase
               .from('bookmark_tags')
               .select('*', { count: 'exact', head: true })
@@ -42,6 +48,8 @@ export function CategoryPills() {
           })
         )
 
+        if (!mountedRef.current) return
+
         // Sort by count and take top 12
         const sortedTags = tagsWithCounts
           .filter(t => t.count > 0)
@@ -50,13 +58,23 @@ export function CategoryPills() {
 
         setTags(sortedTags)
       } catch (err) {
+        // Silently handle AbortError from component unmount
+        if (err instanceof Error && err.name === 'AbortError') {
+          return
+        }
         console.error('Error fetching tags:', err)
       } finally {
-        setLoading(false)
+        if (mountedRef.current) {
+          setLoading(false)
+        }
       }
     }
 
     fetchTags()
+    
+    return () => {
+      mountedRef.current = false
+    }
   }, [supabase])
 
   if (loading) {

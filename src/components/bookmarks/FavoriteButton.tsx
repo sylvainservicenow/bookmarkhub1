@@ -17,30 +17,42 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
   const [supabase] = useState(() => createClient())
   const [isAnimating, setIsAnimating] = useState(false)
   const previousState = useRef(isFavorited)
+  const mountedRef = useRef(true)
 
   const checkFavoriteStatus = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('favorites')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('bookmark_id', bookmarkId)
-      .single()
+    if (!mountedRef.current) return
+    
+    try {
+      const { data } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('bookmark_id', bookmarkId)
+        .single()
 
-    setIsFavorited(!!data)
+      if (mountedRef.current) {
+        setIsFavorited(!!data)
+      }
+    } catch (err) {
+      // Silently handle - PGRST116 means no favorite found, which is fine
+    }
   }, [supabase, bookmarkId])
 
   useEffect(() => {
-    let mounted = true
+    mountedRef.current = true
 
     const initAuth = async () => {
       try {
         const { data: { user: currentUser }, error } = await supabase.auth.getUser()
         
         if (error && error.name !== 'AuthSessionMissingError') {
-          console.error('FavoriteButton auth error:', error)
+          // Silently handle AbortError
+          if (!(error instanceof Error && error.name === 'AbortError')) {
+            console.error('FavoriteButton auth error:', error)
+          }
         }
         
-        if (!mounted) return
+        if (!mountedRef.current) return
         
         setUser(currentUser)
         
@@ -48,9 +60,13 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
           await checkFavoriteStatus(currentUser.id)
         }
       } catch (err) {
+        // Silently handle AbortError
+        if (err instanceof Error && err.name === 'AbortError') {
+          return
+        }
         console.error('FavoriteButton init error:', err)
       } finally {
-        if (mounted) {
+        if (mountedRef.current) {
           setLoading(false)
         }
       }
@@ -59,7 +75,7 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
     initAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return
+      if (!mountedRef.current) return
       
       setUser(session?.user ?? null)
       
@@ -71,7 +87,7 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
     })
 
     return () => {
-      mounted = false
+      mountedRef.current = false
       subscription.unsubscribe()
     }
   }, [supabase, checkFavoriteStatus])

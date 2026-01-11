@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { 
   Bookmark, ArrowLeft, Plus, Archive, CheckSquare, Square, 
   Loader2, Filter, ArrowUpDown, Clock, Eye, EyeOff, RotateCcw,
-  CheckCircle, Trash2
+  CheckCircle
 } from 'lucide-react'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 
@@ -37,44 +37,65 @@ export default function MyBookmarksPage() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
   const [actionFeedback, setActionFeedback] = useState<string | null>(null)
+  const mountedRef = useRef(true)
   
   const router = useRouter()
   const supabase = createClient()
 
   const fetchBookmarks = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      router.push('/login?redirect=/bookmarks')
-      return
-    }
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!mountedRef.current) return
+      
+      if (!user) {
+        router.push('/login?redirect=/bookmarks')
+        return
+      }
 
-    const { data, error } = await supabase
-      .from('bookmarks')
-      .select(`
-        id,
-        title,
-        url,
-        description,
-        status,
-        visibility,
-        created_at,
-        favicon_url,
-        bookmark_tags (
-          tags (id, name)
-        )
-      `)
-      .eq('creator_id', user.id)
-      .order(sortField, { ascending: sortOrder === 'asc' })
+      const { data, error } = await supabase
+        .from('bookmarks')
+        .select(`
+          id,
+          title,
+          url,
+          description,
+          status,
+          visibility,
+          created_at,
+          favicon_url,
+          bookmark_tags (
+            tags (id, name)
+          )
+        `)
+        .eq('creator_id', user.id)
+        .order(sortField, { ascending: sortOrder === 'asc' })
 
-    if (!error && data) {
-      setBookmarks(data as BookmarkType[])
+      if (!mountedRef.current) return
+
+      if (!error && data) {
+        setBookmarks(data as BookmarkType[])
+      }
+    } catch (err) {
+      // Silently handle AbortError
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
+      console.error('Error fetching bookmarks:', err)
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false)
+      }
     }
-    setLoading(false)
   }
 
   useEffect(() => {
+    mountedRef.current = true
     fetchBookmarks()
+    
+    return () => {
+      mountedRef.current = false
+    }
   }, [sortField, sortOrder])
 
   // Filter and group bookmarks

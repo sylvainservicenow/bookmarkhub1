@@ -42,7 +42,14 @@ export function BookmarkFavicon({ faviconUrl, title, size = 'sm' }: BookmarkFavi
     lg: 'rounded-xl',
   }
 
-  if (!faviconUrl || hasError) {
+  // Always show fallback if no URL or error occurred
+  // Also show fallback for URLs that are likely to fail (localhost, internal domains)
+  const shouldShowFallback = !faviconUrl || hasError || 
+    faviconUrl.includes('localhost') || 
+    faviconUrl.includes('127.0.0.1') ||
+    faviconUrl.includes('efaidnbmnnnibpcajpcglclefindmkaj') // Chrome extension URLs
+
+  if (shouldShowFallback) {
     return (
       <div className={`${sizeClasses[size]} ${roundedClasses[size]} ${bgColor} flex items-center justify-center text-white font-semibold shrink-0`}>
         {firstLetter}
@@ -57,6 +64,7 @@ export function BookmarkFavicon({ faviconUrl, title, size = 'sm' }: BookmarkFavi
         alt=""
         className="w-full h-full object-contain p-1"
         onError={() => setHasError(true)}
+        loading="lazy"
       />
     </div>
   )

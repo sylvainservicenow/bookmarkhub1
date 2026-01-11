@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, ArrowLeft, Loader2, Save } from 'lucide-react'
@@ -29,14 +29,20 @@ export default function EditBookmarkPage({
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const mountedRef = useRef(true)
   
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
+    mountedRef.current = true
+    
     const init = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
+        
+        if (!mountedRef.current) return
+        
         if (!user) {
           router.push('/login')
           return
@@ -53,8 +59,9 @@ export default function EditBookmarkPage({
           .eq('creator_id', user.id)
           .single()
 
+        if (!mountedRef.current) return
+
         if (bookmarkError || !bookmark) {
-          console.error('Bookmark not found:', bookmarkError)
           setNotFound(true)
           setInitialLoading(false)
           return
@@ -74,16 +81,30 @@ export default function EditBookmarkPage({
           .eq('status', 'active')
           .order('name')
         
-        if (tags) setAvailableTags(tags)
+        if (mountedRef.current && tags) {
+          setAvailableTags(tags)
+        }
       } catch (err) {
+        // Silently handle AbortError
+        if (err instanceof Error && err.name === 'AbortError') {
+          return
+        }
         console.error('Init error:', err)
-        setError('Failed to load bookmark')
+        if (mountedRef.current) {
+          setError('Failed to load bookmark')
+        }
       } finally {
-        setInitialLoading(false)
+        if (mountedRef.current) {
+          setInitialLoading(false)
+        }
       }
     }
 
     init()
+    
+    return () => {
+      mountedRef.current = false
+    }
   }, [bookmarkId, supabase, router])
 
   const handleSubmit = async (e: React.FormEvent) => {

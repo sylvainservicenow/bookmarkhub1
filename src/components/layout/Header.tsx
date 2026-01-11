@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { BookmarkIcon, User as UserIcon, Plus, Loader2 } from 'lucide-react'
@@ -20,8 +20,11 @@ export function Header() {
   const [profile, setProfile] = useState<{ name: string | null; avatar_url: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
   const [supabase] = useState(() => createClient())
+  const mountedRef = useRef(true)
 
   const fetchProfile = useCallback(async (userId: string) => {
+    if (!mountedRef.current) return null
+    
     try {
       const { data, error } = await supabase
         .from('users')
@@ -30,26 +33,32 @@ export function Header() {
         .single()
       
       if (error) {
-        console.error('Profile fetch error:', error)
+        // Don't log PGRST116 (no rows) as error - it's expected for new users
+        if (error.code !== 'PGRST116') {
+          console.error('Profile fetch error:', error)
+        }
         return null
       }
       return data
     } catch (err) {
+      // Silently handle AbortError from component unmount
+      if (err instanceof Error && err.name === 'AbortError') {
+        return null
+      }
       console.error('Profile fetch exception:', err)
       return null
     }
   }, [supabase])
 
   useEffect(() => {
-    let mounted = true
+    mountedRef.current = true
     
     // Timeout to prevent infinite loading
     const timeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('Auth check timed out, assuming not logged in')
+      if (mountedRef.current && loading) {
         setLoading(false)
       }
-    }, 5000) // 5 second timeout
+    }, 5000)
     
     // Get initial session
     const initAuth = async () => {
@@ -61,20 +70,24 @@ export function Header() {
           console.error('Session error:', error)
         }
         
-        if (!mounted) return
+        if (!mountedRef.current) return
         
         setUser(currentUser)
         
         if (currentUser) {
           const profileData = await fetchProfile(currentUser.id)
-          if (mounted) {
+          if (mountedRef.current) {
             setProfile(profileData)
           }
         }
       } catch (err) {
+        // Silently handle AbortError
+        if (err instanceof Error && err.name === 'AbortError') {
+          return
+        }
         console.error('Auth init error:', err)
       } finally {
-        if (mounted) {
+        if (mountedRef.current) {
           setLoading(false)
         }
       }
@@ -84,13 +97,13 @@ export function Header() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return
+      if (!mountedRef.current) return
       
       setUser(session?.user ?? null)
       
       if (session?.user) {
         const profileData = await fetchProfile(session.user.id)
-        if (mounted) {
+        if (mountedRef.current) {
           setProfile(profileData)
         }
       } else {
@@ -99,11 +112,11 @@ export function Header() {
     })
 
     return () => {
-      mounted = false
+      mountedRef.current = false
       clearTimeout(timeout)
       subscription.unsubscribe()
     }
-  }, [supabase, fetchProfile, loading])
+  }, [supabase, fetchProfile])
 
   const displayName = profile?.name || user?.email?.split('@')[0] || ''
   const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
