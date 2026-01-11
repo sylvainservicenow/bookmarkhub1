@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Send } from 'lucide-react'
+import { Send, Loader2 } from 'lucide-react'
+import { User } from '@supabase/supabase-js'
 
 interface CommentFormProps {
   bookmarkId: string
@@ -12,51 +13,110 @@ interface CommentFormProps {
 export function CommentForm({ bookmarkId }: CommentFormProps) {
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
+
+  useEffect(() => {
+    let mounted = true
+
+    const initAuth = async () => {
+      try {
+        const { data: { user: currentUser }, error } = await supabase.auth.getUser()
+        
+        if (error && error.name !== 'AuthSessionMissingError') {
+          console.error('CommentForm auth error:', error)
+        }
+        
+        if (mounted) {
+          setUser(currentUser)
+        }
+      } catch (err) {
+        console.error('CommentForm init error:', err)
+      } finally {
+        if (mounted) {
+          setCheckingAuth(false)
+        }
+      }
+    }
+    
+    initAuth()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (mounted) {
+          setUser(session?.user ?? null)
+        }
+      }
+    )
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!content.trim()) return
     
-    setLoading(true)
-    setError(null)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    
     if (!user) {
       router.push(`/login?redirect=/bookmark/${bookmarkId}`)
       return
     }
+    
+    setLoading(true)
+    setError(null)
 
-    // Get user profile for name
-    const { data: profile } = await supabase
-      .from('users')
-      .select('name, email')
-      .eq('id', user.id)
-      .single()
+    try {
+      // Get user profile for name
+      const { data: profile } = await supabase
+        .from('users')
+        .select('name, email')
+        .eq('id', user.id)
+        .single()
 
-    const { error: insertError } = await supabase
-      .from('comments')
-      .insert({
-        bookmark_id: bookmarkId,
-        author_id: user.id,
-        author_name: profile?.name || user.email?.split('@')[0],
-        author_email: profile?.email || user.email,
-        content: content.trim(),
-        status: 'active',
-      })
+      const { error: insertError } = await supabase
+        .from('comments')
+        .insert({
+          bookmark_id: bookmarkId,
+          author_id: user.id,
+          author_name: profile?.name || user.email?.split('@')[0],
+          author_email: profile?.email || user.email,
+          content: content.trim(),
+          status: 'active',
+        })
 
-    if (insertError) {
-      setError(insertError.message)
-    } else {
-      setContent('')
-      router.refresh()
+      if (insertError) {
+        setError(insertError.message)
+      } else {
+        setContent('')
+        router.refresh()
+      }
+    } catch (err) {
+      console.error('Comment submit error:', err)
+      setError('Failed to post comment')
+    } finally {
+      setLoading(false)
     }
+  }
 
-    setLoading(false)
+  // Show nothing while checking auth (parent component handles login prompt)
+  if (checkingAuth) {
+    return (
+      <div className="flex items-center gap-2 text-gray-400 text-sm">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading...
+      </div>
+    )
+  }
+
+  // If not logged in, don't show the form (parent handles login prompt)
+  if (!user) {
+    return null
   }
 
   return (
@@ -83,7 +143,11 @@ export function CommentForm({ bookmarkId }: CommentFormProps) {
           disabled={loading || !content.trim()}
           className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          <Send className="h-4 w-4" />
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
           {loading ? 'Posting...' : 'Post Comment'}
         </button>
       </div>
