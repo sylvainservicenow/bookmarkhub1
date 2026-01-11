@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/contexts/AuthContext'
 import { Heart, Loader2 } from 'lucide-react'
-import { User } from '@supabase/supabase-js'
 
 interface FavoriteButtonProps {
   bookmarkId: string
@@ -11,9 +11,9 @@ interface FavoriteButtonProps {
 }
 
 export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonProps) {
+  const { user } = useAuth()
   const [isFavorited, setIsFavorited] = useState(initialFavorited ?? false)
-  const [loading, setLoading] = useState(!initialFavorited)
-  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
   const [supabase] = useState(() => createClient())
   const [isAnimating, setIsAnimating] = useState(false)
   const previousState = useRef(isFavorited)
@@ -34,63 +34,27 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
         setIsFavorited(!!data)
       }
     } catch (err) {
-      // Silently handle - PGRST116 means no favorite found, which is fine
+      // Silently handle - PGRST116 means no favorite found
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false)
+      }
     }
   }, [supabase, bookmarkId])
 
   useEffect(() => {
     mountedRef.current = true
 
-    const initAuth = async () => {
-      try {
-        const { data: { user: currentUser }, error } = await supabase.auth.getUser()
-        
-        if (error && error.name !== 'AuthSessionMissingError') {
-          // Silently handle AbortError
-          if (!(error instanceof Error && error.name === 'AbortError')) {
-            console.error('FavoriteButton auth error:', error)
-          }
-        }
-        
-        if (!mountedRef.current) return
-        
-        setUser(currentUser)
-        
-        if (currentUser) {
-          await checkFavoriteStatus(currentUser.id)
-        }
-      } catch (err) {
-        // Silently handle AbortError
-        if (err instanceof Error && err.name === 'AbortError') {
-          return
-        }
-        console.error('FavoriteButton init error:', err)
-      } finally {
-        if (mountedRef.current) {
-          setLoading(false)
-        }
-      }
+    if (user) {
+      checkFavoriteStatus(user.id)
+    } else {
+      setLoading(false)
     }
-    
-    initAuth()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mountedRef.current) return
-      
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        await checkFavoriteStatus(session.user.id)
-      } else {
-        setIsFavorited(false)
-      }
-    })
 
     return () => {
       mountedRef.current = false
-      subscription.unsubscribe()
     }
-  }, [supabase, checkFavoriteStatus])
+  }, [user, checkFavoriteStatus])
 
   const toggleFavorite = async () => {
     if (!user) {
@@ -98,14 +62,10 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
       return
     }
 
-    // Store previous state for rollback
     previousState.current = isFavorited
-    
-    // OPTIMISTIC UPDATE - Update UI immediately
     const newState = !isFavorited
     setIsFavorited(newState)
     
-    // Trigger animation when favoriting
     if (newState) {
       setIsAnimating(true)
       setTimeout(() => setIsAnimating(false), 300)
@@ -113,7 +73,6 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
 
     try {
       if (previousState.current) {
-        // Was favorited, now removing
         const { error } = await supabase
           .from('favorites')
           .delete()
@@ -122,7 +81,6 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
         
         if (error) throw error
       } else {
-        // Was not favorited, now adding
         const { error } = await supabase
           .from('favorites')
           .insert({
@@ -133,10 +91,13 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
         if (error) throw error
       }
     } catch (err) {
-      // ROLLBACK on error
       console.error('Toggle favorite error:', err)
       setIsFavorited(previousState.current)
     }
+  }
+
+  if (!user) {
+    return null
   }
 
   return (

@@ -1,10 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { User } from '@supabase/supabase-js'
-import { BookmarkIcon, User as UserIcon, Plus, Loader2 } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { BookmarkIcon, User as UserIcon, Plus, Loader2, LogOut } from 'lucide-react'
+import { useState } from 'react'
 
 // Avatar mapping - must match settings page
 const AVATAR_MAP: Record<string, string> = {
@@ -16,107 +15,8 @@ const AVATAR_MAP: Record<string, string> = {
 }
 
 export function Header() {
-  const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<{ name: string | null; avatar_url: string | null } | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [supabase] = useState(() => createClient())
-  const mountedRef = useRef(true)
-
-  const fetchProfile = useCallback(async (userId: string) => {
-    if (!mountedRef.current) return null
-    
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('name, avatar_url')
-        .eq('id', userId)
-        .single()
-      
-      if (error) {
-        // Don't log PGRST116 (no rows) as error - it's expected for new users
-        if (error.code !== 'PGRST116') {
-          console.error('Profile fetch error:', error)
-        }
-        return null
-      }
-      return data
-    } catch (err) {
-      // Silently handle AbortError from component unmount
-      if (err instanceof Error && err.name === 'AbortError') {
-        return null
-      }
-      console.error('Profile fetch exception:', err)
-      return null
-    }
-  }, [supabase])
-
-  useEffect(() => {
-    mountedRef.current = true
-    
-    // Timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      if (mountedRef.current && loading) {
-        setLoading(false)
-      }
-    }, 5000)
-    
-    // Get initial session
-    const initAuth = async () => {
-      try {
-        const { data: { user: currentUser }, error } = await supabase.auth.getUser()
-        
-        // AuthSessionMissingError is expected when not logged in - don't log it
-        if (error && error.name !== 'AuthSessionMissingError') {
-          console.error('Session error:', error)
-        }
-        
-        if (!mountedRef.current) return
-        
-        setUser(currentUser)
-        
-        if (currentUser) {
-          const profileData = await fetchProfile(currentUser.id)
-          if (mountedRef.current) {
-            setProfile(profileData)
-          }
-        }
-      } catch (err) {
-        // Silently handle AbortError
-        if (err instanceof Error && err.name === 'AbortError') {
-          return
-        }
-        console.error('Auth init error:', err)
-      } finally {
-        if (mountedRef.current) {
-          setLoading(false)
-        }
-      }
-    }
-    
-    initAuth()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mountedRef.current) return
-      
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        const profileData = await fetchProfile(session.user.id)
-        if (mountedRef.current) {
-          setProfile(profileData)
-        }
-      } else {
-        setProfile(null)
-      }
-    })
-
-    return () => {
-      mountedRef.current = false
-      clearTimeout(timeout)
-      subscription.unsubscribe()
-    }
-  }, [supabase, fetchProfile])
+  const { user, profile, loading, signOut } = useAuth()
+  const [showDropdown, setShowDropdown] = useState(false)
 
   const displayName = profile?.name || user?.email?.split('@')[0] || ''
   const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
@@ -149,18 +49,74 @@ export function Header() {
                   <span className="hidden sm:inline">Add Bookmark</span>
                 </Link>
                 
-                {/* User Menu */}
-                <Link
-                  href="/dashboard"
-                  className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
-                >
-                  <div className="h-9 w-9 rounded-full bg-primary-100 flex items-center justify-center text-lg transition-transform hover:scale-105">
-                    {avatarEmoji || <UserIcon className="h-5 w-5 text-primary-600" />}
-                  </div>
-                  <span className="hidden sm:block text-sm font-medium">
-                    {displayName}
-                  </span>
-                </Link>
+                {/* User Menu with Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowDropdown(!showDropdown)}
+                    className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
+                  >
+                    <div className="h-9 w-9 rounded-full bg-primary-100 flex items-center justify-center text-lg transition-transform hover:scale-105">
+                      {avatarEmoji || <UserIcon className="h-5 w-5 text-primary-600" />}
+                    </div>
+                    <span className="hidden sm:block text-sm font-medium">
+                      {displayName}
+                    </span>
+                  </button>
+                  
+                  {/* Dropdown Menu */}
+                  {showDropdown && (
+                    <>
+                      {/* Backdrop */}
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setShowDropdown(false)} 
+                      />
+                      
+                      {/* Menu */}
+                      <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 animate-fade-in">
+                        <Link
+                          href="/dashboard"
+                          onClick={() => setShowDropdown(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          Dashboard
+                        </Link>
+                        <Link
+                          href="/bookmarks"
+                          onClick={() => setShowDropdown(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          My Bookmarks
+                        </Link>
+                        <Link
+                          href="/favorites"
+                          onClick={() => setShowDropdown(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          Favorites
+                        </Link>
+                        <Link
+                          href="/settings"
+                          onClick={() => setShowDropdown(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          Settings
+                        </Link>
+                        <hr className="my-1 border-gray-200" />
+                        <button
+                          onClick={() => {
+                            setShowDropdown(false)
+                            signOut()
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Sign Out
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </>
             ) : (
               <div className="flex items-center gap-2">

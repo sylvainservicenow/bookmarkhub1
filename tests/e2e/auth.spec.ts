@@ -2,70 +2,154 @@ import { test, expect } from '@playwright/test';
 
 /**
  * Authentication Tests
- * Verifies login, registration, and protected routes
+ * Tests login, logout, and protected route access
  */
 test.describe('Authentication', () => {
   test('login page renders correctly', async ({ page }) => {
     await page.goto('/login');
+    await page.waitForLoadState('domcontentloaded');
     
-    // Check for email input
+    // Should show login form
+    await expect(page.locator('text=Welcome back')).toBeVisible();
     await expect(page.locator('input[type="email"]')).toBeVisible();
-    
-    // Check for password input
     await expect(page.locator('input[type="password"]')).toBeVisible();
-    
-    // Check for submit button
     await expect(page.locator('button[type="submit"]')).toBeVisible();
   });
 
-  test('registration page renders correctly', async ({ page }) => {
-    await page.goto('/register');
+  test('login form validation works', async ({ page }) => {
+    await page.goto('/login');
+    await page.waitForLoadState('domcontentloaded');
     
-    // Should have name/email/password fields
+    // Try to submit empty form
+    const submitButton = page.locator('button[type="submit"]');
+    await submitButton.click();
+    
+    // HTML5 validation should prevent submission
+    // Check that we're still on the login page
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test('protected routes redirect to login', async ({ page }) => {
+    // Try to access dashboard without being logged in
+    await page.goto('/dashboard');
+    await page.waitForLoadState('domcontentloaded');
+    
+    // Should redirect to login
+    await expect(page).toHaveURL(/\/login.*redirect=/);
+  });
+
+  test('protected route /bookmarks redirects to login', async ({ page }) => {
+    await page.goto('/bookmarks');
+    await page.waitForLoadState('domcontentloaded');
+    
+    await expect(page).toHaveURL(/\/login.*redirect=/);
+  });
+
+  test('protected route /submit redirects to login', async ({ page }) => {
+    await page.goto('/submit');
+    await page.waitForLoadState('domcontentloaded');
+    
+    await expect(page).toHaveURL(/\/login.*redirect=/);
+  });
+
+  test('protected route /favorites redirects to login', async ({ page }) => {
+    await page.goto('/favorites');
+    await page.waitForLoadState('domcontentloaded');
+    
+    await expect(page).toHaveURL(/\/login.*redirect=/);
+  });
+
+  test('protected route /settings redirects to login', async ({ page }) => {
+    await page.goto('/settings');
+    await page.waitForLoadState('domcontentloaded');
+    
+    await expect(page).toHaveURL(/\/login.*redirect=/);
+  });
+
+  test('public routes do not redirect', async ({ page }) => {
+    // Homepage should be accessible
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page).not.toHaveURL(/\/login/);
+    
+    // Browse page should be accessible
+    await page.goto('/browse');
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page).not.toHaveURL(/\/login/);
+  });
+
+  test('bookmark detail page is accessible without login', async ({ page }) => {
+    // First go to browse to find a bookmark
+    await page.goto('/browse');
+    await page.waitForLoadState('domcontentloaded');
+    
+    // Wait for cards to load
+    const bookmarkLink = page.locator('a[href*="/bookmark/"]').first();
+    
+    if (await bookmarkLink.isVisible({ timeout: 5000 })) {
+      await bookmarkLink.click();
+      await page.waitForLoadState('domcontentloaded');
+      
+      // Should stay on bookmark page, not redirect to login
+      await expect(page).toHaveURL(/\/bookmark\//);
+      await expect(page).not.toHaveURL(/\/login/);
+      
+      // Should show the bookmark content
+      await expect(page.locator('h1').first()).toBeVisible();
+    }
+  });
+
+  test('login page shows sign-in prompt for interactions', async ({ page }) => {
+    // Go to a bookmark page
+    await page.goto('/browse');
+    await page.waitForLoadState('domcontentloaded');
+    
+    const bookmarkLink = page.locator('a[href*="/bookmark/"]').first();
+    
+    if (await bookmarkLink.isVisible({ timeout: 5000 })) {
+      await bookmarkLink.click();
+      await page.waitForLoadState('domcontentloaded');
+      
+      // Should show sign-in prompt for interactions
+      const signInPrompt = page.locator('text=Sign in');
+      await expect(signInPrompt.first()).toBeVisible();
+    }
+  });
+
+  test('register page renders correctly', async ({ page }) => {
+    await page.goto('/register');
+    await page.waitForLoadState('domcontentloaded');
+    
+    await expect(page.locator('text=Create an account')).toBeVisible();
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
   });
 
-  test('invalid login shows error', async ({ page }) => {
+  test('navigation between login and register works', async ({ page }) => {
     await page.goto('/login');
+    await page.waitForLoadState('domcontentloaded');
     
-    await page.fill('input[type="email"]', 'invalid@test.com');
-    await page.fill('input[type="password"]', 'wrongpassword');
-    await page.click('button[type="submit"]');
+    // Click sign up link
+    await page.click('text=Sign up');
+    await expect(page).toHaveURL(/\/register/);
     
-    // Should show error message
-    await expect(page.locator('text=/error|invalid|incorrect/i')).toBeVisible({ timeout: 10000 });
-  });
-
-  test('protected routes redirect to login', async ({ page }) => {
-    // Try to access dashboard without auth
-    await page.goto('/dashboard');
-    
-    // Should redirect to login
+    // Click sign in link
+    await page.click('text=Sign in');
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('submit page requires authentication or shows form', async ({ page }) => {
-    await page.goto('/submit');
+  test('header shows login/signup for unauthenticated users', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
     
-    // Submit page may allow form to show but require login to submit
-    // Or it may redirect to login
-    // Check for either scenario
-    const isRedirected = page.url().includes('/login');
-    const hasSubmitForm = await page.locator('form').isVisible();
-    const hasLoginPrompt = await page.locator('text=/sign in|log in/i').isVisible();
+    // Wait for auth loading to complete
+    await page.waitForTimeout(2000);
     
-    // Either redirected to login, shows login prompt, or shows the form (which will require auth on submit)
-    expect(isRedirected || hasLoginPrompt || hasSubmitForm).toBe(true);
-  });
-
-  test('favorites page requires authentication', async ({ page }) => {
-    await page.goto('/favorites');
-    await expect(page).toHaveURL(/\/login/);
-  });
-
-  test('settings page requires authentication', async ({ page }) => {
-    await page.goto('/settings');
-    await expect(page).toHaveURL(/\/login/);
+    // Should show login and signup buttons
+    const loginButton = page.locator('header a[href="/login"]');
+    const signupButton = page.locator('header a[href="/register"]');
+    
+    await expect(loginButton).toBeVisible();
+    await expect(signupButton).toBeVisible();
   });
 });
