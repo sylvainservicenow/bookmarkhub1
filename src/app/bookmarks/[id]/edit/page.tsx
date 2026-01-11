@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, ArrowLeft, X } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, ArrowLeft, Loader2, Save } from 'lucide-react'
 import Link from 'next/link'
 
 interface TagType {
@@ -16,7 +16,9 @@ export default function EditBookmarkPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const [bookmarkId, setBookmarkId] = useState<string>('')
+  // Unwrap params using React.use()
+  const { id: bookmarkId } = use(params)
+  
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -26,57 +28,63 @@ export default function EditBookmarkPage({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
   
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     const init = async () => {
-      const { id } = await params
-      setBookmarkId(id)
-      
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/login')
+          return
+        }
+
+        // Fetch bookmark
+        const { data: bookmark, error: bookmarkError } = await supabase
+          .from('bookmarks')
+          .select(`
+            *,
+            bookmark_tags (tag_id)
+          `)
+          .eq('id', bookmarkId)
+          .eq('creator_id', user.id)
+          .single()
+
+        if (bookmarkError || !bookmark) {
+          console.error('Bookmark not found:', bookmarkError)
+          setNotFound(true)
+          setInitialLoading(false)
+          return
+        }
+
+        setUrl(bookmark.url)
+        setTitle(bookmark.title)
+        setDescription(bookmark.description || '')
+        setIsPublic(bookmark.visibility === 'public')
+        setSelectedTags(bookmark.bookmark_tags?.map((bt: any) => bt.tag_id) || [])
+
+        // Fetch tags
+        const { data: tags } = await supabase
+          .from('tags')
+          .select('id, name')
+          .eq('visibility', 'public')
+          .eq('status', 'active')
+          .order('name')
+        
+        if (tags) setAvailableTags(tags)
+      } catch (err) {
+        console.error('Init error:', err)
+        setError('Failed to load bookmark')
+      } finally {
+        setInitialLoading(false)
       }
-
-      // Fetch bookmark
-      const { data: bookmark, error: bookmarkError } = await supabase
-        .from('bookmarks')
-        .select(`
-          *,
-          bookmark_tags (tag_id)
-        `)
-        .eq('id', id)
-        .eq('creator_id', user.id)
-        .single()
-
-      if (bookmarkError || !bookmark) {
-        router.push('/bookmarks')
-        return
-      }
-
-      setUrl(bookmark.url)
-      setTitle(bookmark.title)
-      setDescription(bookmark.description || '')
-      setIsPublic(bookmark.visibility === 'public')
-      setSelectedTags(bookmark.bookmark_tags?.map((bt: any) => bt.tag_id) || [])
-
-      // Fetch tags
-      const { data: tags } = await supabase
-        .from('tags')
-        .select('id, name')
-        .eq('visibility', 'public')
-        .eq('status', 'active')
-        .order('name')
-      
-      if (tags) setAvailableTags(tags)
-      setInitialLoading(false)
     }
 
     init()
-  }, [params, supabase, router])
+  }, [bookmarkId, supabase, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -137,17 +145,39 @@ export default function EditBookmarkPage({
   if (initialLoading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading bookmark...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (notFound) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <div className="text-center">
+          <BookmarkIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Bookmark not found</h1>
+          <p className="text-gray-600 mb-4">This bookmark doesn't exist or you don't have permission to edit it.</p>
+          <Link
+            href="/bookmarks"
+            className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to My Bookmarks
+          </Link>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] py-8 px-4">
+    <div className="min-h-[calc(100vh-64px)] py-8 px-4 animate-fade-in">
       <div className="max-w-2xl mx-auto">
         <Link
           href="/bookmarks"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to My Bookmarks
@@ -160,7 +190,7 @@ export default function EditBookmarkPage({
 
         <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
           {error && (
-            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
+            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm animate-fade-in">
               {error}
             </div>
           )}
@@ -177,7 +207,8 @@ export default function EditBookmarkPage({
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              disabled={loading}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
             />
           </div>
 
@@ -193,7 +224,8 @@ export default function EditBookmarkPage({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              disabled={loading}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
             />
           </div>
 
@@ -208,7 +240,8 @@ export default function EditBookmarkPage({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none"
+              disabled={loading}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
             />
           </div>
 
@@ -224,11 +257,12 @@ export default function EditBookmarkPage({
                   key={tag.id}
                   type="button"
                   onClick={() => toggleTag(tag.id)}
-                  className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                  disabled={loading}
+                  className={`px-3 py-1 rounded-full text-sm transition-all duration-150 ${
                     selectedTags.includes(tag.id)
                       ? 'bg-primary-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  } disabled:opacity-50`}
                 >
                   {tag.name}
                 </button>
@@ -248,6 +282,7 @@ export default function EditBookmarkPage({
                   type="radio"
                   checked={isPublic}
                   onChange={() => setIsPublic(true)}
+                  disabled={loading}
                   className="text-primary-600 focus:ring-primary-500"
                 />
                 <span className="text-sm text-gray-700">Public</span>
@@ -257,6 +292,7 @@ export default function EditBookmarkPage({
                   type="radio"
                   checked={!isPublic}
                   onChange={() => setIsPublic(false)}
+                  disabled={loading}
                   className="text-primary-600 focus:ring-primary-500"
                 />
                 <span className="text-sm text-gray-700">Restricted</span>
@@ -269,13 +305,23 @@ export default function EditBookmarkPage({
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 active:bg-primary-800 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
             >
-              {loading ? 'Saving...' : 'Save Changes'}
+              {loading ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-5 w-5" />
+                  Save Changes
+                </>
+              )}
             </button>
             <Link
               href="/bookmarks"
-              className="px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
+              className="px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 active:bg-gray-300 transition-colors"
             >
               Cancel
             </Link>

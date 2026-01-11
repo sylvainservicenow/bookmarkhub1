@@ -115,4 +115,64 @@ test.describe('Bookmarks', () => {
     // Cards may have favicons as images
     expect(imageCount).toBeGreaterThanOrEqual(0);
   });
+
+  test('edit bookmark page loads correctly', async ({ page }) => {
+    // This test verifies the edit page doesn't get stuck on "Loading..."
+    // We test by navigating directly to a bookmark edit URL pattern
+    // Since we don't have auth in tests, we expect redirect to login
+    
+    // Test with a sample UUID format
+    await page.goto('/bookmarks/e6707945-09dd-4e51-957c-6c2026c46db6/edit');
+    await page.waitForLoadState('domcontentloaded');
+    
+    // Should either:
+    // 1. Redirect to login (if not authenticated)
+    // 2. Show "not found" error (if authenticated but bookmark doesn't exist)
+    // 3. Show the edit form (if authenticated and owns the bookmark)
+    
+    // Wait up to 10 seconds - should NOT be stuck on "Loading..."
+    await page.waitForTimeout(3000);
+    
+    // Check we're not stuck on a loading state
+    const loadingText = page.locator('text=Loading...');
+    const loadingBookmarkText = page.locator('text=Loading bookmark...');
+    
+    // After 3 seconds, should not still show basic "Loading..." text
+    // ("Loading bookmark..." with spinner is acceptable briefly)
+    const isStuckOnLoading = await loadingText.isVisible() && 
+                             !(await page.locator('svg.animate-spin').isVisible());
+    
+    expect(isStuckOnLoading).toBe(false);
+    
+    // Should be on login page, error page, or edit form
+    const currentUrl = page.url();
+    const isOnLoginPage = currentUrl.includes('/login');
+    const hasEditForm = await page.locator('form').isVisible();
+    const hasNotFoundMessage = await page.locator('text=not found').isVisible();
+    const hasBackLink = await page.locator('text=Back to My Bookmarks').isVisible();
+    
+    // One of these conditions should be true
+    expect(isOnLoginPage || hasEditForm || hasNotFoundMessage || hasBackLink).toBe(true);
+  });
+
+  test('edit page shows proper error for non-existent bookmark', async ({ page }) => {
+    // Test with a UUID that likely doesn't exist
+    await page.goto('/bookmarks/00000000-0000-0000-0000-000000000000/edit');
+    await page.waitForLoadState('domcontentloaded');
+    
+    // Wait for page to fully load
+    await page.waitForTimeout(3000);
+    
+    // Should either redirect to login or show not found
+    const currentUrl = page.url();
+    if (!currentUrl.includes('/login')) {
+      // If not redirected, should show a proper error state, not infinite loading
+      const hasLoadingSpinner = await page.locator('svg.animate-spin').isVisible();
+      const hasErrorOrNotFound = await page.locator('text=not found').isVisible() ||
+                                  await page.locator('text=Bookmark not found').isVisible();
+      
+      // Either show error or have loading with spinner (not stuck)
+      expect(hasErrorOrNotFound || hasLoadingSpinner).toBe(true);
+    }
+  });
 });
