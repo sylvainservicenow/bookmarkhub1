@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 
 export async function HeroStats() {
   const supabase = await createClient()
@@ -10,14 +11,15 @@ export async function HeroStats() {
     .eq('status', 'active')
     .eq('visibility', 'public')
 
-  const { count: totalUsers } = await supabase
-    .from('users')
-    .select('*', { count: 'exact', head: true })
-
   const { count: totalTags } = await supabase
     .from('tags')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'active')
+
+  // Count unique tags used in bookmarks (categories)
+  const { count: totalCategories } = await supabase
+    .from('bookmark_tags')
+    .select('tag_id', { count: 'exact', head: true })
 
   const formatCount = (count: number | null) => {
     if (!count) return '0'
@@ -28,30 +30,30 @@ export async function HeroStats() {
 
   return (
     <div className="flex items-center justify-center gap-8 md:gap-16">
-      <div className="text-center">
-        <div className="text-2xl md:text-3xl font-bold text-primary-500">
+      <Link href="/browse" className="text-center group">
+        <div className="text-2xl md:text-3xl font-bold text-primary-500 group-hover:text-primary-600 transition-colors">
           {formatCount(totalBookmarks)}
         </div>
-        <div className="text-sm text-gray-500">Bookmarks</div>
-      </div>
+        <div className="text-sm text-gray-500 group-hover:text-gray-700 transition-colors">Bookmarks</div>
+      </Link>
       
       <div className="h-8 w-px bg-gray-300" />
       
-      <div className="text-center">
-        <div className="text-2xl md:text-3xl font-bold text-primary-500">
-          {formatCount(totalUsers)}
-        </div>
-        <div className="text-sm text-gray-500">Contributors</div>
-      </div>
-      
-      <div className="h-8 w-px bg-gray-300" />
-      
-      <div className="text-center">
-        <div className="text-2xl md:text-3xl font-bold text-primary-500">
+      <Link href="/browse" className="text-center group">
+        <div className="text-2xl md:text-3xl font-bold text-primary-500 group-hover:text-primary-600 transition-colors">
           {formatCount(totalTags)}
         </div>
-        <div className="text-sm text-gray-500">Categories</div>
-      </div>
+        <div className="text-sm text-gray-500 group-hover:text-gray-700 transition-colors">Tags</div>
+      </Link>
+      
+      <div className="h-8 w-px bg-gray-300" />
+      
+      <Link href="/browse" className="text-center group">
+        <div className="text-2xl md:text-3xl font-bold text-primary-500 group-hover:text-primary-600 transition-colors">
+          {formatCount(totalCategories)}
+        </div>
+        <div className="text-sm text-gray-500 group-hover:text-gray-700 transition-colors">Categories</div>
+      </Link>
     </div>
   )
 }
