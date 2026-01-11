@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
-import { BookmarkIcon, User as UserIcon } from 'lucide-react'
+import { BookmarkIcon, User as UserIcon, Plus } from 'lucide-react'
 
 // Avatar mapping - must match settings page
 const AVATAR_MAP: Record<string, string> = {
@@ -67,26 +67,38 @@ export function Header() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <BookmarkIcon className="h-8 w-8 text-primary-600" />
-            <span className="text-xl font-bold text-gray-900">Bookmark Hub</span>
+            <BookmarkIcon className="h-7 w-7 text-primary-500" />
+            <span className="text-xl font-bold text-gray-900">BookmarkHub</span>
           </Link>
 
           {/* Right side */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {loading ? (
               <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse" />
             ) : user ? (
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-2 text-gray-700 hover:text-gray-900"
-              >
-                <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-lg">
-                  {avatarEmoji || <UserIcon className="h-5 w-5 text-primary-600" />}
-                </div>
-                <span className="hidden sm:block text-sm font-medium">
-                  {displayName}
-                </span>
-              </Link>
+              <>
+                {/* Add Bookmark Button */}
+                <Link
+                  href="/submit"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors text-sm font-medium"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Add Bookmark</span>
+                </Link>
+                
+                {/* User Menu */}
+                <Link
+                  href="/dashboard"
+                  className="flex items-center gap-2 text-gray-700 hover:text-gray-900"
+                >
+                  <div className="h-9 w-9 rounded-full bg-primary-100 flex items-center justify-center text-lg">
+                    {avatarEmoji || <UserIcon className="h-5 w-5 text-primary-600" />}
+                  </div>
+                  <span className="hidden sm:block text-sm font-medium">
+                    {displayName}
+                  </span>
+                </Link>
+              </>
             ) : (
               <div className="flex items-center gap-2">
                 <Link
@@ -97,7 +109,7 @@ export function Header() {
                 </Link>
                 <Link
                   href="/register"
-                  className="text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 px-4 py-2 rounded-lg"
+                  className="text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 px-4 py-2 rounded-lg transition-colors"
                 >
                   Sign up
                 </Link>
