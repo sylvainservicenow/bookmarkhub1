@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Star } from 'lucide-react'
+import { User } from '@supabase/supabase-js'
 
 interface RatingStarsProps {
   bookmarkId: string
@@ -16,78 +17,118 @@ export function RatingStars({ bookmarkId, initialRating, totalRatings = 0, avera
   const [userRating, setUserRating] = useState<number | null>(initialRating ?? null)
   const [hoveredRating, setHoveredRating] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
+  const [user, setUser] = useState<User | null>(null)
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
+
+  const fetchUserRating = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('ratings')
+      .select('rating')
+      .eq('bookmark_id', bookmarkId)
+      .eq('user_id', userId)
+      .single()
+    
+    if (data) {
+      setUserRating(data.rating)
+    }
+  }, [supabase, bookmarkId])
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setIsLoggedIn(!!session?.user)
-      
-      if (session?.user) {
-        // Fetch user's existing rating
-        const { data } = await supabase
-          .from('ratings')
-          .select('rating')
-          .eq('bookmark_id', bookmarkId)
-          .eq('user_id', session.user.id)
-          .single()
+    let mounted = true
+
+    const initAuth = async () => {
+      try {
+        // Use getUser() instead of getSession() for more reliable auth state
+        const { data: { user: currentUser }, error } = await supabase.auth.getUser()
         
-        if (data) {
-          setUserRating(data.rating)
+        if (error) {
+          console.error('RatingStars auth error:', error)
+        }
+        
+        if (!mounted) return
+        
+        setUser(currentUser)
+        
+        if (currentUser) {
+          await fetchUserRating(currentUser.id)
+        }
+      } catch (err) {
+        console.error('RatingStars init error:', err)
+      } finally {
+        if (mounted) {
+          setCheckingAuth(false)
         }
       }
     }
-    checkUser()
-  }, [supabase, bookmarkId])
+    
+    initAuth()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return
+      
+      setUser(session?.user ?? null)
+      
+      if (session?.user) {
+        await fetchUserRating(session.user.id)
+      } else {
+        setUserRating(null)
+      }
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [supabase, fetchUserRating])
 
   const handleRate = async (rating: number) => {
-    if (!isLoggedIn) {
+    if (!user) {
       router.push(`/login?redirect=/bookmark/${bookmarkId}`)
       return
     }
 
     setLoading(true)
-    
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
+
+    try {
+      // Check if user already rated
+      const { data: existingRating } = await supabase
+        .from('ratings')
+        .select('id')
+        .eq('bookmark_id', bookmarkId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (existingRating) {
+        // Update existing rating
+        await supabase
+          .from('ratings')
+          .update({ rating, updated_at: new Date().toISOString() })
+          .eq('id', existingRating.id)
+      } else {
+        // Create new rating
+        await supabase
+          .from('ratings')
+          .insert({
+            bookmark_id: bookmarkId,
+            user_id: user.id,
+            rating,
+          })
+      }
+
+      setUserRating(rating)
+      router.refresh()
+    } catch (err) {
+      console.error('Rating error:', err)
+    } finally {
       setLoading(false)
-      return
     }
-
-    // Check if user already rated
-    const { data: existingRating } = await supabase
-      .from('ratings')
-      .select('id')
-      .eq('bookmark_id', bookmarkId)
-      .eq('user_id', user.id)
-      .single()
-
-    if (existingRating) {
-      // Update existing rating
-      await supabase
-        .from('ratings')
-        .update({ rating, updated_at: new Date().toISOString() })
-        .eq('id', existingRating.id)
-    } else {
-      // Create new rating
-      await supabase
-        .from('ratings')
-        .insert({
-          bookmark_id: bookmarkId,
-          user_id: user.id,
-          rating,
-        })
-    }
-
-    setUserRating(rating)
-    setLoading(false)
-    router.refresh()
   }
 
   const displayRating = hoveredRating ?? userRating ?? 0
+  const isLoggedIn = !!user
 
   return (
     <div className="flex flex-col gap-2">
@@ -99,7 +140,7 @@ export function RatingStars({ bookmarkId, initialRating, totalRatings = 0, avera
             onClick={() => handleRate(star)}
             onMouseEnter={() => setHoveredRating(star)}
             onMouseLeave={() => setHoveredRating(null)}
-            disabled={loading}
+            disabled={loading || checkingAuth}
             className="p-0.5 transition-transform hover:scale-110 disabled:opacity-50"
             title={`Rate ${star} star${star !== 1 ? 's' : ''}`}
           >
@@ -113,8 +154,10 @@ export function RatingStars({ bookmarkId, initialRating, totalRatings = 0, avera
           </button>
         ))}
         
-        {loading && (
-          <span className="ml-2 text-sm text-gray-400">Saving...</span>
+        {(loading || checkingAuth) && (
+          <span className="ml-2 text-sm text-gray-400">
+            {checkingAuth ? 'Checking...' : 'Saving...'}
+          </span>
         )}
       </div>
 
@@ -135,7 +178,7 @@ export function RatingStars({ bookmarkId, initialRating, totalRatings = 0, avera
         )}
       </div>
 
-      {!isLoggedIn && (
+      {!checkingAuth && !isLoggedIn && (
         <p className="text-xs text-gray-400">
           <a href={`/login?redirect=/bookmark/${bookmarkId}`} className="text-primary-600 hover:underline">
             Log in
