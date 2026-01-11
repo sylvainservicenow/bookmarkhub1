@@ -9,6 +9,7 @@ const PROTECTED_ROUTES = [
   '/favorites',
   '/settings',
   '/groups',
+  '/admin',
 ]
 
 // Routes that should redirect to dashboard if already authenticated
@@ -48,7 +49,7 @@ export async function updateSession(request: NextRequest) {
   if (isProtectedRoute && (error || !user)) {
     // Redirect to login with the original URL as redirect target
     const redirectUrl = new URL('/login', request.url)
-    redirectUrl.searchParams.set('redirect', pathname)
+    redirectUrl.searchParams.set('redirect', pathname + request.nextUrl.search)
     return NextResponse.redirect(redirectUrl)
   }
 

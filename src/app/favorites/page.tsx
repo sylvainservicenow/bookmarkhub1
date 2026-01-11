@@ -1,53 +1,79 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { Heart, ArrowLeft } from 'lucide-react'
+import { Heart, ArrowLeft, Loader2 } from 'lucide-react'
 import { BookmarkCard } from '@/components/bookmarks/BookmarkCard'
 
-export default async function FavoritesPage() {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    redirect('/login?redirect=/favorites')
+export default function FavoritesPage() {
+  const { user, loading: authLoading } = useAuth()
+  const [bookmarks, setBookmarks] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [supabase] = useState(() => createClient())
+
+  useEffect(() => {
+    if (!user) return
+
+    const fetchFavorites = async () => {
+      const { data: favorites } = await supabase
+        .from('favorites')
+        .select(`
+          id,
+          created_at,
+          bookmarks!inner (
+            id,
+            title,
+            url,
+            description,
+            visibility,
+            status,
+            created_at,
+            favicon_url,
+            bookmark_tags (
+              tags (id, name, status)
+            ),
+            ratings (rating)
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('bookmarks.status', 'active')
+        .order('created_at', { ascending: false })
+
+      const bookmarksList = favorites
+        ?.map(f => f.bookmarks)
+        .filter(Boolean) || []
+
+      setBookmarks(bookmarksList)
+      setLoading(false)
+    }
+
+    fetchFavorites()
+  }, [user, supabase])
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading favorites...</span>
+        </div>
+      </div>
+    )
   }
 
-  // Only get favorites for active bookmarks
-  const { data: favorites } = await supabase
-    .from('favorites')
-    .select(`
-      id,
-      created_at,
-      bookmarks!inner (
-        id,
-        title,
-        url,
-        description,
-        visibility,
-        status,
-        created_at,
-        bookmark_tags (
-          tags (id, name, status)
-        ),
-        ratings (rating)
-      )
-    `)
-    .eq('user_id', user.id)
-    .eq('bookmarks.status', 'active')
-    .order('created_at', { ascending: false })
-
-  const bookmarks = favorites
-    ?.map(f => f.bookmarks)
-    .filter(Boolean) || []
+  if (!user) {
+    return null // Middleware will redirect
+  }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">
       {/* Header */}
       <div className="mb-8">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Dashboard
@@ -79,7 +105,7 @@ export default async function FavoritesPage() {
             </p>
             <Link
               href="/search"
-              className="inline-flex px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+              className="inline-flex px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
             >
               Browse Bookmarks
             </Link>

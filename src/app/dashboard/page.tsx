@@ -1,7 +1,10 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { LogOut, Plus, Bookmark, Heart, User, Search, ExternalLink, Calendar, Mail, Edit, Archive, Shield } from 'lucide-react'
+import { LogOut, Plus, Bookmark, Heart, User, Search, ExternalLink, Calendar, Mail, Edit, Archive, Shield, Loader2 } from 'lucide-react'
 
 // Avatar mapping - must match settings page
 const AVATAR_MAP: Record<string, string> = {
@@ -12,67 +15,97 @@ const AVATAR_MAP: Record<string, string> = {
   flower: '🌸', tree: '🌳', mountain: '🏔️', crystal: '💎', robot: '🤖',
 }
 
-export default async function DashboardPage() {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    redirect('/login')
+export default function DashboardPage() {
+  const { user, profile, signOut, loading: authLoading } = useAuth()
+  const [stats, setStats] = useState({
+    bookmarkCount: 0,
+    archivedCount: 0,
+    favoriteCount: 0,
+  })
+  const [recentBookmarks, setRecentBookmarks] = useState<any[]>([])
+  const [recentFavorites, setRecentFavorites] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [supabase] = useState(() => createClient())
+
+  useEffect(() => {
+    if (!user) return
+
+    const fetchData = async () => {
+      // Fetch user's active bookmarks count
+      const { count: bookmarkCount } = await supabase
+        .from('bookmarks')
+        .select('*', { count: 'exact', head: true })
+        .eq('creator_id', user.id)
+        .eq('status', 'active')
+
+      // Fetch user's archived bookmarks count
+      const { count: archivedCount } = await supabase
+        .from('bookmarks')
+        .select('*', { count: 'exact', head: true })
+        .eq('creator_id', user.id)
+        .eq('status', 'archived')
+
+      // Fetch user's favorites count
+      const { count: favoriteCount } = await supabase
+        .from('favorites')
+        .select('*, bookmarks!inner(*)', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('bookmarks.status', 'active')
+
+      setStats({
+        bookmarkCount: bookmarkCount || 0,
+        archivedCount: archivedCount || 0,
+        favoriteCount: favoriteCount || 0,
+      })
+
+      // Fetch recent bookmarks
+      const { data: bookmarks } = await supabase
+        .from('bookmarks')
+        .select('id, title, url, created_at')
+        .eq('creator_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      setRecentBookmarks(bookmarks || [])
+
+      // Fetch recent favorites
+      const { data: favorites } = await supabase
+        .from('favorites')
+        .select('bookmark_id, bookmarks!inner(id, title, url)')
+        .eq('user_id', user.id)
+        .eq('bookmarks.status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      setRecentFavorites(favorites || [])
+      setLoading(false)
+    }
+
+    fetchData()
+  }, [user, supabase])
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading dashboard...</span>
+        </div>
+      </div>
+    )
   }
 
-  // Get user profile
-  const { data: profile } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  // Fetch user's active bookmarks count
-  const { count: bookmarkCount } = await supabase
-    .from('bookmarks')
-    .select('*', { count: 'exact', head: true })
-    .eq('creator_id', user.id)
-    .eq('status', 'active')
-
-  // Fetch user's archived bookmarks count
-  const { count: archivedCount } = await supabase
-    .from('bookmarks')
-    .select('*', { count: 'exact', head: true })
-    .eq('creator_id', user.id)
-    .eq('status', 'archived')
-
-  // Fetch user's favorites count
-  const { count: favoriteCount } = await supabase
-    .from('favorites')
-    .select('*, bookmarks!inner(*)', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('bookmarks.status', 'active')
-
-  // Fetch recent bookmarks
-  const { data: recentBookmarks } = await supabase
-    .from('bookmarks')
-    .select('id, title, url, created_at')
-    .eq('creator_id', user.id)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  // Fetch recent favorites
-  const { data: recentFavorites } = await supabase
-    .from('favorites')
-    .select('bookmark_id, bookmarks!inner(id, title, url)')
-    .eq('user_id', user.id)
-    .eq('bookmarks.status', 'active')
-    .order('created_at', { ascending: false })
-    .limit(5)
+  if (!user) {
+    return null // Middleware will redirect
+  }
 
   const displayName = profile?.name || user.email?.split('@')[0]
   const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
   const isAdmin = profile?.role === 'admin'
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div className="flex items-center gap-4">
@@ -94,7 +127,7 @@ export default async function DashboardPage() {
             </p>
             <p className="text-gray-400 text-xs flex items-center gap-1 mt-1">
               <Calendar className="h-3 w-3" />
-              Member since {new Date(profile?.created_at || user.created_at).toLocaleDateString()}
+              Member since {new Date(profile?.created_at || user.created_at || Date.now()).toLocaleDateString()}
             </p>
           </div>
         </div>
@@ -115,15 +148,13 @@ export default async function DashboardPage() {
             <Edit className="h-4 w-4" />
             Edit Profile
           </Link>
-          <form action="/api/auth/signout" method="POST">
-            <button
-              type="submit"
-              className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </button>
-          </form>
+          <button
+            onClick={signOut}
+            className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
         </div>
       </div>
 
@@ -132,7 +163,7 @@ export default async function DashboardPage() {
         <Link href="/bookmarks" className="bg-white border border-gray-200 rounded-lg p-4 hover:border-primary-300 hover:shadow-sm transition-all">
           <div className="flex items-center justify-between">
             <Bookmark className="h-8 w-8 text-primary-500" />
-            <span className="text-3xl font-bold text-gray-900">{bookmarkCount || 0}</span>
+            <span className="text-3xl font-bold text-gray-900">{stats.bookmarkCount}</span>
           </div>
           <p className="text-gray-600 text-sm mt-2">My Bookmarks</p>
         </Link>
@@ -140,7 +171,7 @@ export default async function DashboardPage() {
         <Link href="/favorites" className="bg-white border border-gray-200 rounded-lg p-4 hover:border-red-300 hover:shadow-sm transition-all">
           <div className="flex items-center justify-between">
             <Heart className="h-8 w-8 text-red-500" />
-            <span className="text-3xl font-bold text-gray-900">{favoriteCount || 0}</span>
+            <span className="text-3xl font-bold text-gray-900">{stats.favoriteCount}</span>
           </div>
           <p className="text-gray-600 text-sm mt-2">Favorites</p>
         </Link>
@@ -148,7 +179,7 @@ export default async function DashboardPage() {
         <Link href="/bookmarks" className="bg-white border border-gray-200 rounded-lg p-4 hover:border-amber-300 hover:shadow-sm transition-all">
           <div className="flex items-center justify-between">
             <Archive className="h-8 w-8 text-amber-500" />
-            <span className="text-3xl font-bold text-gray-900">{archivedCount || 0}</span>
+            <span className="text-3xl font-bold text-gray-900">{stats.archivedCount}</span>
           </div>
           <p className="text-gray-600 text-sm mt-2">Archived</p>
         </Link>
@@ -191,14 +222,11 @@ export default async function DashboardPage() {
               View all
             </Link>
           </div>
-          {recentBookmarks && recentBookmarks.length > 0 ? (
+          {recentBookmarks.length > 0 ? (
             <ul className="space-y-3">
               {recentBookmarks.map((bookmark: any) => (
                 <li key={bookmark.id} className="group">
-                  <Link
-                    href={`/bookmark/${bookmark.id}`}
-                    className="block"
-                  >
+                  <Link href={`/bookmark/${bookmark.id}`} className="block">
                     <p className="text-gray-900 group-hover:text-primary-600 line-clamp-1 font-medium">
                       {bookmark.title}
                     </p>
@@ -231,14 +259,11 @@ export default async function DashboardPage() {
               View all
             </Link>
           </div>
-          {recentFavorites && recentFavorites.length > 0 ? (
+          {recentFavorites.length > 0 ? (
             <ul className="space-y-3">
               {recentFavorites.map((fav: any) => (
                 <li key={fav.bookmark_id} className="group">
-                  <Link
-                    href={`/bookmark/${fav.bookmark_id}`}
-                    className="block"
-                  >
+                  <Link href={`/bookmark/${fav.bookmark_id}`} className="block">
                     <p className="text-gray-900 group-hover:text-primary-600 line-clamp-1 font-medium">
                       {fav.bookmarks?.title}
                     </p>

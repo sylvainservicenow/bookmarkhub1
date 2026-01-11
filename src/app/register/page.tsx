@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { BookmarkIcon, Loader2, UserPlus, CheckCircle, Mail } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { BookmarkIcon, Loader2, UserPlus, Mail } from 'lucide-react'
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
@@ -13,8 +14,16 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const { user, loading: authLoading } = useAuth()
   const router = useRouter()
   const supabase = createClient()
+
+  // If already logged in, redirect
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push('/dashboard')
+    }
+  }, [user, authLoading, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,6 +46,23 @@ export default function RegisterPage() {
     } else {
       setSuccess(true)
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+      </div>
+    )
+  }
+
+  if (user) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+        <span className="ml-2 text-gray-600">Redirecting...</span>
+      </div>
+    )
   }
 
   if (success) {

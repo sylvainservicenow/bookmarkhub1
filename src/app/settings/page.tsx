@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { ArrowLeft, User, Mail, Calendar, Shield, Save, Check } from 'lucide-react'
+import { ArrowLeft, User, Mail, Calendar, Shield, Save, Check, Loader2 } from 'lucide-react'
 
 // 25 avatar options - fun, inclusive, non-human icons
 const AVATAR_OPTIONS = [
@@ -36,54 +36,25 @@ const AVATAR_OPTIONS = [
 ]
 
 export default function SettingsPage() {
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth()
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
   const [selectedAvatar, setSelectedAvatar] = useState('')
-  const [role, setRole] = useState('')
-  const [createdAt, setCreatedAt] = useState('')
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [user, setUser] = useState<any>(null)
-  
-  const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
   useEffect(() => {
-    const loadUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        router.push('/login?redirect=/settings')
-        return
-      }
-      
-      setUser(user)
-      setEmail(user.email || '')
-      
-      // Get profile from public.users
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-      
-      if (profile) {
-        setName(profile.name || '')
-        setSelectedAvatar(profile.avatar_url || '')
-        setRole(profile.role || 'user')
-        setCreatedAt(profile.created_at)
-      }
-      
-      setLoading(false)
+    if (profile) {
+      setName(profile.name || '')
+      setSelectedAvatar(profile.avatar_url || '')
     }
-    
-    loadUser()
-  }, [supabase, router])
+  }, [profile])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!user) return
+    
     setError(null)
     setSaving(true)
     setSuccess(false)
@@ -101,6 +72,7 @@ export default function SettingsPage() {
       setError(updateError.message)
     } else {
       setSuccess(true)
+      await refreshProfile()
       setTimeout(() => setSuccess(false), 3000)
     }
 
@@ -109,21 +81,28 @@ export default function SettingsPage() {
 
   const currentAvatar = AVATAR_OPTIONS.find(a => a.id === selectedAvatar)
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading settings...</span>
+        </div>
       </div>
     )
   }
 
+  if (!user) {
+    return null // Middleware will redirect
+  }
+
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className="max-w-2xl mx-auto px-4 py-8 animate-fade-in">
       {/* Header */}
       <div className="mb-8">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Dashboard
@@ -141,13 +120,13 @@ export default function SettingsPage() {
         </h2>
 
         {error && (
-          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
+          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm animate-fade-in">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="bg-green-50 text-green-600 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+          <div className="bg-green-50 text-green-600 px-4 py-3 rounded-lg text-sm flex items-center gap-2 animate-fade-in">
             <Check className="h-4 w-4" />
             Settings saved successfully!
           </div>
@@ -190,7 +169,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={() => setSelectedAvatar('')}
-              className="mt-3 text-sm text-gray-500 hover:text-gray-700"
+              className="mt-3 text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
               Clear selection
             </button>
@@ -208,7 +187,8 @@ export default function SettingsPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Your name"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+            disabled={saving}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:bg-gray-50 transition-colors"
           />
         </div>
 
@@ -216,9 +196,13 @@ export default function SettingsPage() {
         <button
           type="submit"
           disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
         >
-          <Save className="h-4 w-4" />
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </form>
@@ -234,19 +218,19 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3 text-gray-600">
             <Mail className="h-4 w-4" />
             <span className="font-medium">Email:</span>
-            <span>{email}</span>
+            <span>{user.email}</span>
           </div>
           
           <div className="flex items-center gap-3 text-gray-600">
             <Shield className="h-4 w-4" />
             <span className="font-medium">Role:</span>
-            <span className="capitalize">{role}</span>
+            <span className="capitalize">{profile?.role || 'user'}</span>
           </div>
           
           <div className="flex items-center gap-3 text-gray-600">
             <Calendar className="h-4 w-4" />
             <span className="font-medium">Member since:</span>
-            <span>{new Date(createdAt).toLocaleDateString()}</span>
+            <span>{new Date(profile?.created_at || user.created_at || Date.now()).toLocaleDateString()}</span>
           </div>
         </div>
 
