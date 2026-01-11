@@ -120,8 +120,8 @@ export default async function BrowsePage({
     })
   }
   
-  // Get recent activity
-  const { data: recentActivity } = await supabase
+  // Get recent activity - use any type to handle Supabase nested relations
+  const { data: recentActivityData } = await supabase
     .from('bookmarks')
     .select(`
       id,
@@ -134,6 +134,14 @@ export default async function BrowsePage({
     .order('created_at', { ascending: false })
     .limit(8)
   
+  // Transform to handle array/object from Supabase
+  const recentActivity = (recentActivityData as any[] || []).map((item) => ({
+    id: item.id as string,
+    title: item.title as string,
+    created_at: item.created_at as string,
+    users: item.users
+  }))
+  
   // Get top contributors
   const { data: contributors } = await supabase
     .from('bookmarks')
@@ -141,14 +149,15 @@ export default async function BrowsePage({
     .eq('status', 'active')
     .eq('visibility', 'public')
   
-  // Count bookmarks per user
+  // Count bookmarks per user - handle array/object from Supabase
   const contributorCounts: Record<string, { id: string; name: string; count: number }> = {}
   contributors?.forEach((b: any) => {
-    if (b.users?.id) {
-      if (!contributorCounts[b.users.id]) {
-        contributorCounts[b.users.id] = { id: b.users.id, name: b.users.name || 'Anonymous', count: 0 }
+    const userObj = Array.isArray(b.users) ? b.users[0] : b.users
+    if (userObj?.id) {
+      if (!contributorCounts[userObj.id]) {
+        contributorCounts[userObj.id] = { id: userObj.id, name: userObj.name || 'Anonymous', count: 0 }
       }
-      contributorCounts[b.users.id].count++
+      contributorCounts[userObj.id].count++
     }
   })
   
@@ -205,7 +214,7 @@ export default async function BrowsePage({
           {/* Right Sidebar - Activity */}
           <aside className="lg:col-span-3">
             <ActivitySidebar
-              recentActivity={recentActivity || []}
+              recentActivity={recentActivity}
               popularTags={popularTags}
             />
           </aside>
