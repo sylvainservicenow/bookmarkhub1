@@ -83,10 +83,11 @@ export async function TopRatedSection() {
       
       {/* Top Rated Cards - 3x2 Grid */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {topRated.map((bookmark: any) => (
+        {topRated.map((bookmark: any, index: number) => (
           <TopRatedBookmarkCard 
             key={bookmark.id} 
             bookmark={bookmark}
+            rank={index + 1}
           />
         ))}
       </div>
