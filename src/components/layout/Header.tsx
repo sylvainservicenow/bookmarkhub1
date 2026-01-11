@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
-import { BookmarkIcon, User as UserIcon, Plus } from 'lucide-react'
+import { BookmarkIcon, User as UserIcon, Plus, Loader2 } from 'lucide-react'
 
 // Avatar mapping - must match settings page
 const AVATAR_MAP: Record<string, string> = {
@@ -46,7 +46,7 @@ export function Header() {
     // Get initial session
     const initAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession()
+        const { data: { user: currentUser }, error } = await supabase.auth.getUser()
         
         if (error) {
           console.error('Session error:', error)
@@ -54,10 +54,10 @@ export function Header() {
         
         if (!mounted) return
         
-        setUser(session?.user ?? null)
+        setUser(currentUser)
         
-        if (session?.user) {
-          const profileData = await fetchProfile(session.user.id)
+        if (currentUser) {
+          const profileData = await fetchProfile(currentUser.id)
           if (mounted) {
             setProfile(profileData)
           }
@@ -111,7 +111,10 @@ export function Header() {
           {/* Right side */}
           <div className="flex items-center gap-3">
             {loading ? (
-              <div className="h-8 w-8 rounded-full bg-gray-200 animate-pulse" />
+              <div className="flex items-center gap-2 text-gray-400">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm hidden sm:inline">Loading...</span>
+              </div>
             ) : user ? (
               <>
                 {/* Add Bookmark Button */}
