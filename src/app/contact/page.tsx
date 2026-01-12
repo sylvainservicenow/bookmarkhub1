@@ -180,7 +180,7 @@ export default function ContactPage() {
             <button
               type="submit"
               disabled={status === 'loading'}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-orange-600 hover:to-amber-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow"
+              className="w-full flex items-center justify-center gap-2 bg-primary-500 text-white py-3 px-6 rounded-xl font-semibold hover:bg-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow"
             >
               {status === 'loading' ? (
                 <>

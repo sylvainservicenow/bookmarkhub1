@@ -96,7 +96,7 @@ export default function HelpPage() {
           <p className="text-gray-600 mb-4">We&apos;re here to help!</p>
           <Link 
             href="/contact"
-            className="inline-block bg-gradient-to-r from-orange-500 to-amber-500 text-white px-6 py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-amber-600 transition-all"
+            className="inline-block bg-primary-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-600 transition-all"
           >
             Contact Us
           </Link>
