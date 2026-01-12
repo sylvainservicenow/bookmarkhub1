@@ -37,6 +37,7 @@ export default function MyBookmarksPage() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
   const [actionFeedback, setActionFeedback] = useState<string | null>(null)
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
   const [supabase] = useState(() => createClient())
 
   const fetchBookmarks = async () => {
@@ -123,13 +124,71 @@ export default function MyBookmarksPage() {
   }
 
   const handleSingleArchive = async (id: string) => {
-    const { error } = await supabase.from('bookmarks').update({ status: 'archived' }).eq('id', id)
-    if (!error) { showFeedback('Bookmark archived'); await fetchBookmarks() }
+    // Prevent double-clicks and concurrent operations
+    if (loadingIds.has(id)) return
+    
+    setLoadingIds(prev => new Set(prev).add(id))
+    
+    try {
+      const { error } = await supabase
+        .from('bookmarks')
+        .update({ status: 'archived' })
+        .eq('id', id)
+      
+      if (!error) {
+        // Optimistic update - update local state immediately
+        setBookmarks(prev => prev.map(b => 
+          b.id === id ? { ...b, status: 'archived' } : b
+        ))
+        showFeedback('Bookmark archived')
+      } else {
+        console.error('Archive error:', error)
+        showFeedback('Failed to archive bookmark')
+      }
+    } catch (err) {
+      console.error('Archive exception:', err)
+      showFeedback('Failed to archive bookmark')
+    } finally {
+      setLoadingIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(id)
+        return newSet
+      })
+    }
   }
 
   const handleSingleRestore = async (id: string) => {
-    const { error } = await supabase.from('bookmarks').update({ status: 'active' }).eq('id', id)
-    if (!error) { showFeedback('Bookmark restored'); await fetchBookmarks() }
+    // Prevent double-clicks and concurrent operations
+    if (loadingIds.has(id)) return
+    
+    setLoadingIds(prev => new Set(prev).add(id))
+    
+    try {
+      const { error } = await supabase
+        .from('bookmarks')
+        .update({ status: 'active' })
+        .eq('id', id)
+      
+      if (!error) {
+        // Optimistic update - update local state immediately
+        setBookmarks(prev => prev.map(b => 
+          b.id === id ? { ...b, status: 'active' } : b
+        ))
+        showFeedback('Bookmark restored')
+      } else {
+        console.error('Restore error:', error)
+        showFeedback('Failed to restore bookmark')
+      }
+    } catch (err) {
+      console.error('Restore exception:', err)
+      showFeedback('Failed to restore bookmark')
+    } finally {
+      setLoadingIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(id)
+        return newSet
+      })
+    }
   }
 
   const toggleSort = (field: SortField) => {
@@ -256,49 +315,62 @@ export default function MyBookmarksPage() {
           </div>
 
           <div className="divide-y divide-gray-200">
-            {visibleBookmarks.map((bookmark) => (
-              <div key={bookmark.id} className={`grid grid-cols-[auto,1fr,auto,auto] gap-4 px-4 py-3 items-center transition-colors ${selectedIds.has(bookmark.id) ? 'bg-primary-50' : 'hover:bg-gray-50'} ${bookmark.status === 'archived' ? 'opacity-60' : ''}`}>
-                <div>
-                  <button onClick={() => toggleSelect(bookmark.id)} className="p-1 hover:bg-gray-200 rounded transition-colors">
-                    {selectedIds.has(bookmark.id) ? <CheckSquare className="h-5 w-5 text-primary-600" /> : <Square className="h-5 w-5 text-gray-400" />}
-                  </button>
-                </div>
+            {visibleBookmarks.map((bookmark) => {
+              const isLoading = loadingIds.has(bookmark.id)
+              return (
+                <div key={bookmark.id} className={`grid grid-cols-[auto,1fr,auto,auto] gap-4 px-4 py-3 items-center transition-colors ${selectedIds.has(bookmark.id) ? 'bg-primary-50' : 'hover:bg-gray-50'} ${bookmark.status === 'archived' ? 'opacity-60' : ''}`}>
+                  <div>
+                    <button onClick={() => toggleSelect(bookmark.id)} className="p-1 hover:bg-gray-200 rounded transition-colors">
+                      {selectedIds.has(bookmark.id) ? <CheckSquare className="h-5 w-5 text-primary-600" /> : <Square className="h-5 w-5 text-gray-400" />}
+                    </button>
+                  </div>
 
-                <div className="min-w-0">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <BookmarkFavicon faviconUrl={bookmark.favicon_url} title={bookmark.title} size="sm" />
+                      <Link href={`/bookmark/${bookmark.id}`} className="font-medium text-gray-900 hover:text-primary-600 truncate transition-colors">
+                        {bookmark.title}
+                      </Link>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-gray-500 truncate max-w-[300px]">{bookmark.url}</span>
+                      {bookmark.bookmark_tags?.slice(0, 3).map((bt) => bt.tags && (
+                        <span key={bt.tags.id} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">{bt.tags.name}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    {bookmark.status === 'active' && <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full flex items-center gap-1"><Eye className="h-3 w-3" />Active</span>}
+                    {bookmark.status === 'pending' && <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full flex items-center gap-1"><Clock className="h-3 w-3" />Pending</span>}
+                    {bookmark.status === 'archived' && <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full flex items-center gap-1"><EyeOff className="h-3 w-3" />Archived</span>}
+                  </div>
+
                   <div className="flex items-center gap-2">
-                    <BookmarkFavicon faviconUrl={bookmark.favicon_url} title={bookmark.title} size="sm" />
-                    <Link href={`/bookmark/${bookmark.id}`} className="font-medium text-gray-900 hover:text-primary-600 truncate transition-colors">
-                      {bookmark.title}
-                    </Link>
+                    <Link href={`/bookmarks/${bookmark.id}/edit`} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">Edit</Link>
+                    {bookmark.status === 'archived' ? (
+                      <button 
+                        onClick={() => handleSingleRestore(bookmark.id)} 
+                        disabled={isLoading}
+                        className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                        Restore
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => handleSingleArchive(bookmark.id)} 
+                        disabled={isLoading}
+                        className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded hover:bg-amber-200 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Archive className="h-3 w-3" />}
+                        Archive
+                      </button>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-500 truncate max-w-[300px]">{bookmark.url}</span>
-                    {bookmark.bookmark_tags?.slice(0, 3).map((bt) => bt.tags && (
-                      <span key={bt.tags.id} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">{bt.tags.name}</span>
-                    ))}
-                  </div>
                 </div>
-
-                <div>
-                  {bookmark.status === 'active' && <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full flex items-center gap-1"><Eye className="h-3 w-3" />Active</span>}
-                  {bookmark.status === 'pending' && <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full flex items-center gap-1"><Clock className="h-3 w-3" />Pending</span>}
-                  {bookmark.status === 'archived' && <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full flex items-center gap-1"><EyeOff className="h-3 w-3" />Archived</span>}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Link href={`/bookmarks/${bookmark.id}/edit`} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">Edit</Link>
-                  {bookmark.status === 'archived' ? (
-                    <button onClick={() => handleSingleRestore(bookmark.id)} className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors flex items-center gap-1">
-                      <RotateCcw className="h-3 w-3" />Restore
-                    </button>
-                  ) : (
-                    <button onClick={() => handleSingleArchive(bookmark.id)} className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded hover:bg-amber-200 transition-colors flex items-center gap-1">
-                      <Archive className="h-3 w-3" />Archive
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       ) : (
