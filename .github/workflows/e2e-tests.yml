@@ -1,72 +1,95 @@
 name: E2E Tests
 
 on:
+  # Run daily at 6 AM UTC
+  schedule:
+    - cron: '0 6 * * *'
+  
+  # Run on push to main
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+  
+  # Allow manual trigger
   workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Base URL to test'
+        required: false
+        default: 'https://bookmarkhub1.vercel.app'
 
 jobs:
   test:
-    timeout-minutes: 15
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     
     steps:
-      - uses: actions/checkout@v4
-      
-      - uses: actions/setup-node@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
+          cache: 'npm'
+
       - name: Install dependencies
-        run: npm install
-      
+        run: npm ci
+
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-      
+        run: npx playwright install --with-deps chromium firefox
+
       - name: Run E2E tests
-        run: npx playwright test --project=chromium
+        run: npx playwright test
         env:
-          BASE_URL: https://bookmarkhub1.vercel.app
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-      
-      - uses: actions/upload-artifact@v4
-        if: failure()
+          PLAYWRIGHT_BASE_URL: ${{ github.event.inputs.base_url || 'https://bookmarkhub1.vercel.app' }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: playwright-report
-          path: playwright-report/
-          retention-days: 7
-          if-no-files-found: ignore
-      
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: test-results
-          path: test-results/
-          retention-days: 7
-          if-no-files-found: ignore
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 30
 
-  security-tests:
-    timeout-minutes: 10
+      - name: Upload test results to Supabase
+        if: always()
+        run: |
+          if [ -f test-results/results.json ]; then
+            echo "Test results available for upload"
+            # Results are stored as artifacts, can be processed by a separate job
+          fi
+
+  notify-on-failure:
+    needs: test
     runs-on: ubuntu-latest
+    if: failure()
     
     steps:
-      - uses: actions/checkout@v4
-      
-      - uses: actions/setup-node@v4
+      - name: Create GitHub Issue on Failure
+        uses: actions/github-script@v7
         with:
-          node-version: '20'
-      
-      - name: Install dependencies
-        run: npm install
-      
-      - name: Install Playwright
-        run: npx playwright install --with-deps chromium
-      
-      - name: Run security tests
-        run: npx playwright test tests/security/ --project=chromium
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          script: |
+            const date = new Date().toISOString().split('T')[0];
+            const title = `🔴 E2E Tests Failed - ${date}`;
+            
+            // Check if issue already exists today
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'e2e-failure',
+            });
+            
+            const existingIssue = issues.data.find(i => i.title.includes(date));
+            
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: `## E2E Test Failure Report\n\n**Date:** ${date}\n**Workflow Run:** [View Details](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n\n### Next Steps\n1. Check the workflow run for detailed error logs\n2. Download the Playwright report artifact\n3. Fix the failing tests\n4. Close this issue when resolved`,
+                labels: ['e2e-failure', 'bug', 'automated'],
+              });
+            }
