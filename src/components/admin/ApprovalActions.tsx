@@ -34,6 +34,8 @@ export function ApprovalActions({
     setLoading('approve')
     
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+
       switch (type) {
         case 'submission':
           // Get submission data and create bookmark
@@ -59,23 +61,32 @@ export function ApprovalActions({
             
             await supabase
               .from('submissions')
-              .update({ status: 'approved', created_bookmark_id: newBookmark?.id, reviewed_at: new Date().toISOString() })
+              .update({ 
+                status: 'approved', 
+                created_bookmark_id: newBookmark?.id, 
+                reviewed_by: user?.id,
+                reviewed_at: new Date().toISOString() 
+              })
               .eq('id', id)
           }
           break
 
         case 'group_membership':
-          // Add user to group
+          // Update existing pending membership to active
           if (groupId && userId) {
-            await supabase.from('group_members').insert({
-              group_id: groupId,
-              user_id: userId,
-              status: 'active',
-            })
+            await supabase
+              .from('group_members')
+              .update({ status: 'active' })
+              .eq('group_id', groupId)
+              .eq('user_id', userId)
           }
           await supabase
             .from('group_requests')
-            .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+            .update({ 
+              status: 'approved', 
+              reviewed_by: user?.id,
+              reviewed_at: new Date().toISOString() 
+            })
             .eq('id', id)
           break
 
@@ -87,6 +98,7 @@ export function ApprovalActions({
               .insert({
                 name: requestData.name,
                 description: requestData.description,
+                visibility: requestData.visibility || 'private',
                 status: 'active',
               })
               .select()
@@ -97,6 +109,7 @@ export function ApprovalActions({
               await supabase.from('group_members').insert({
                 group_id: newGroup.id,
                 user_id: requestData.requester_id,
+                role: 'admin',
                 status: 'active',
               })
             }
@@ -117,7 +130,11 @@ export function ApprovalActions({
           }
           await supabase
             .from('comment_flags')
-            .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+            .update({ 
+              status: 'approved', 
+              reviewed_by: user?.id,
+              reviewed_at: new Date().toISOString() 
+            })
             .eq('id', id)
           break
 
@@ -134,7 +151,11 @@ export function ApprovalActions({
           }
           await supabase
             .from('archive_requests')
-            .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+            .update({ 
+              status: 'approved', 
+              reviewed_by: user?.id,
+              reviewed_at: new Date().toISOString() 
+            })
             .eq('id', id)
           break
       }
@@ -152,6 +173,18 @@ export function ApprovalActions({
     setLoading('reject')
     
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      // For group membership, also delete the pending membership record
+      if (type === 'group_membership' && groupId && userId) {
+        await supabase
+          .from('group_members')
+          .delete()
+          .eq('group_id', groupId)
+          .eq('user_id', userId)
+          .eq('status', 'pending')
+      }
+
       const table = {
         submission: 'submissions',
         group_membership: 'group_requests',
@@ -164,6 +197,7 @@ export function ApprovalActions({
         .from(table)
         .update({ 
           status: 'rejected', 
+          reviewed_by: user?.id,
           reviewed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
