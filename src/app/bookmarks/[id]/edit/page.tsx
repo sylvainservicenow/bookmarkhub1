@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { useLoadingMonitor } from '@/lib/monitoring'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, ArrowLeft, Loader2, Save } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, ArrowLeft, Loader2, Save, Lock } from 'lucide-react'
 import Link from 'next/link'
 
 interface TagType {
@@ -23,7 +23,7 @@ export default function EditBookmarkPage() {
   const [description, setDescription] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [availableTags, setAvailableTags] = useState<TagType[]>([])
-  const [isPublic, setIsPublic] = useState(true)
+  const [visibility, setVisibility] = useState<'public' | 'private'>('public')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
@@ -90,7 +90,8 @@ export default function EditBookmarkPage() {
         setUrl(bookmark.url)
         setTitle(bookmark.title)
         setDescription(bookmark.description || '')
-        setIsPublic(bookmark.visibility === 'public')
+        // Map 'restricted' to 'private' for backward compatibility
+        setVisibility(bookmark.visibility === 'public' ? 'public' : 'private')
         setSelectedTags(bookmark.bookmark_tags?.map((bt: any) => bt.tag_id) || [])
 
         const { data: tags } = await supabase
@@ -131,7 +132,7 @@ export default function EditBookmarkPage() {
 
     const { error: updateError } = await supabase
       .from('bookmarks')
-      .update({ url, title, description: description || null, visibility: isPublic ? 'public' : 'restricted' })
+      .update({ url, title, description: description || null, visibility })
       .eq('id', bookmarkId)
 
     if (updateError) { setError(updateError.message); setLoading(false); return }
@@ -249,12 +250,16 @@ export default function EditBookmarkPage() {
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2"><Globe className="h-4 w-4" />Visibility</label>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" checked={isPublic} onChange={() => setIsPublic(true)} disabled={loading} className="text-primary-600 focus:ring-primary-500" />
+                <input type="radio" checked={visibility === 'public'} onChange={() => setVisibility('public')} disabled={loading} className="text-primary-600 focus:ring-primary-500" />
+                <Globe className="h-4 w-4 text-green-600" />
                 <span className="text-sm text-gray-700">Public</span>
+                <span className="text-xs text-gray-500">(visible to everyone)</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" checked={!isPublic} onChange={() => setIsPublic(false)} disabled={loading} className="text-primary-600 focus:ring-primary-500" />
-                <span className="text-sm text-gray-700">Restricted</span>
+                <input type="radio" checked={visibility === 'private'} onChange={() => setVisibility('private')} disabled={loading} className="text-primary-600 focus:ring-primary-500" />
+                <Lock className="h-4 w-4 text-amber-600" />
+                <span className="text-sm text-gray-700">Only me</span>
+                <span className="text-xs text-gray-500">(private)</span>
               </label>
             </div>
           </div>
