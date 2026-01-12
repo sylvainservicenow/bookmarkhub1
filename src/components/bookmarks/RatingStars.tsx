@@ -26,18 +26,23 @@ export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingS
     if (!mountedRef.current) return
     
     try {
-      const { data } = await supabase
+      // Use maybeSingle() instead of single() to handle 0 rows gracefully
+      const { data, error } = await supabase
         .from('ratings')
         .select('rating')
         .eq('bookmark_id', bookmarkId)
         .eq('user_id', userId)
-        .single()
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error fetching user rating:', error)
+      }
 
       if (mountedRef.current && data) {
         setUserRating(data.rating)
       }
     } catch (err) {
-      // No rating found is fine
+      console.error('Unexpected error fetching rating:', err)
     } finally {
       if (mountedRef.current) {
         setLoading(false)
