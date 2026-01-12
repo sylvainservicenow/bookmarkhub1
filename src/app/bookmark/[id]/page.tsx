@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, User, Globe, Archive, Pencil, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Calendar, User, Globe, Archive, Lock, ExternalLink } from 'lucide-react'
 import { FavoriteButton } from '@/components/bookmarks/FavoriteButton'
 import { RatingStars } from '@/components/bookmarks/RatingStars'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
@@ -50,6 +50,11 @@ export default async function BookmarkPage({
 
   // Check if current user is the creator
   const isCreator = user && bookmark.creator_id === user.id
+
+  // Check visibility - private bookmarks only visible to creator and admins
+  if (bookmark.visibility === 'private' && !isCreator && !isAdmin) {
+    notFound()
+  }
 
   // Filter to only show active tags
   const tags = bookmark.bookmark_tags
@@ -185,12 +190,16 @@ export default async function BookmarkPage({
 
         {/* Status badges */}
         <div className="mt-4 flex gap-2">
-          <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
+          <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${
             bookmark.visibility === 'public' 
               ? 'bg-green-100 text-green-700' 
-              : 'bg-yellow-100 text-yellow-700'
+              : 'bg-amber-100 text-amber-700'
           }`}>
-            {bookmark.visibility}
+            {bookmark.visibility === 'public' ? (
+              <><Globe className="h-3 w-3" /> public</>
+            ) : (
+              <><Lock className="h-3 w-3" /> private</>
+            )}
           </span>
           {isArchived && (
             <span className="inline-flex px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
