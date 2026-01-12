@@ -10,7 +10,7 @@ export function HeroSection() {
         <div className="flex justify-center mb-6">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border border-gray-100">
             <Sparkles className="h-4 w-4 text-primary-500" />
-            <span className="text-sm font-medium text-gray-700">Discover amazing tools and resources</span>
+            <span className="text-sm font-medium text-gray-700">Discover ServiceNow tools and resources</span>
           </div>
         </div>
         
@@ -21,8 +21,8 @@ export function HeroSection() {
         
         {/* Subheading */}
         <p className="text-lg md:text-xl text-gray-600 text-center mb-10 max-w-2xl mx-auto">
-          Find curated bookmarks from teams worldwide. Browse by popularity,
-          explore categories, and save your favorites.
+          Find curated ServiceNow bookmarks. Browse by popularity,
+          explore categories, save your favorites and share your findings.
         </p>
         
         {/* Search Box */}

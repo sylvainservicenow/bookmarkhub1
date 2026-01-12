@@ -21,6 +21,7 @@ interface AuthContextType {
   error: string | null
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  refreshSession: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [supabase] = useState(() => createClient())
   const mountedRef = useRef(true)
   const initializingRef = useRef(false)
+  const lastRefreshRef = useRef<number>(0)
 
   const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     if (!mountedRef.current) return null
@@ -68,6 +70,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(profileData)
     }
   }, [user, fetchProfile])
+
+  // New function to refresh session - can be called when auth seems stale
+  const refreshSession = useCallback(async () => {
+    // Debounce - don't refresh more than once per 5 seconds
+    const now = Date.now()
+    if (now - lastRefreshRef.current < 5000) {
+      return
+    }
+    lastRefreshRef.current = now
+
+    try {
+      // Try to refresh the session
+      const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+      
+      if (!mountedRef.current) return
+
+      if (refreshError) {
+        console.warn('Session refresh failed:', refreshError.message)
+        // Don't clear auth state on refresh failure - user might still be valid
+        return
+      }
+
+      if (refreshedSession) {
+        setSession(refreshedSession)
+        setUser(refreshedSession.user)
+        
+        const profileData = await fetchProfile(refreshedSession.user.id)
+        if (mountedRef.current) {
+          setProfile(profileData)
+        }
+      }
+    } catch (err) {
+      console.error('Session refresh error:', err)
+    }
+  }, [supabase, fetchProfile])
 
   const signOut = useCallback(async () => {
     try {
@@ -112,12 +149,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!mountedRef.current) return
 
           if (userError || !currentUser) {
-            // Session exists but user validation failed - clear it
-            console.warn('Session invalid, clearing...')
-            await supabase.auth.signOut()
-            setSession(null)
-            setUser(null)
-            setProfile(null)
+            // Session exists but user validation failed - try refresh first
+            console.warn('User validation failed, attempting refresh...')
+            const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
+            
+            if (refreshedSession) {
+              setSession(refreshedSession)
+              setUser(refreshedSession.user)
+              const profileData = await fetchProfile(refreshedSession.user.id)
+              if (mountedRef.current) {
+                setProfile(profileData)
+              }
+            } else {
+              // Refresh also failed, clear auth
+              await supabase.auth.signOut()
+              setSession(null)
+              setUser(null)
+              setProfile(null)
+            }
           } else {
             setSession(currentSession)
             setUser(currentUser)
@@ -172,11 +221,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     )
 
+    // Set up periodic session check (every 60 seconds)
+    const intervalId = setInterval(async () => {
+      if (!mountedRef.current || !session) return
+      
+      // Check if token is about to expire (within 5 minutes)
+      const expiresAt = session.expires_at
+      if (expiresAt) {
+        const expiresInSeconds = expiresAt - Math.floor(Date.now() / 1000)
+        if (expiresInSeconds < 300) {
+          console.log('Token expiring soon, refreshing...')
+          await refreshSession()
+        }
+      }
+    }, 60000)
+
     return () => {
       mountedRef.current = false
       subscription.unsubscribe()
+      clearInterval(intervalId)
     }
-  }, [supabase, fetchProfile])
+  }, [supabase, fetchProfile, refreshSession, session])
+
+  // Also refresh on window focus (user comes back to tab)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (session && mountedRef.current) {
+        refreshSession()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [session, refreshSession])
 
   return (
     <AuthContext.Provider
@@ -188,6 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         signOut,
         refreshProfile,
+        refreshSession,
       }}
     >
       {children}

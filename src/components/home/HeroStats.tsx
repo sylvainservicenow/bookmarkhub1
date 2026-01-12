@@ -16,16 +16,14 @@ export async function HeroStats() {
     .select('*', { count: 'exact', head: true })
     .eq('status', 'active')
 
-  // Count unique tags that are actually used in bookmarks (real categories)
-  // This gets the distinct tag_ids that have at least one bookmark
-  const { data: usedTags } = await supabase
-    .from('bookmark_tags')
-    .select('tag_id')
+  // Count unique contributors (users who have created at least one bookmark)
+  const { data: contributors } = await supabase
+    .from('bookmarks')
+    .select('creator_id')
+    .eq('status', 'active')
+    .not('creator_id', 'is', null)
   
-  // Get unique tag count
-  const uniqueTagIds = usedTags ? new Set(usedTags.map(t => t.tag_id)).size : 0
-  // Cap at a reasonable number for display, show actual if under 50
-  const categoriesCount = Math.min(uniqueTagIds || totalTags || 0, 50)
+  const uniqueContributors = contributors ? new Set(contributors.map(b => b.creator_id)).size : 0
 
   const formatCount = (count: number | null) => {
     if (!count) return '0'
@@ -56,9 +54,9 @@ export async function HeroStats() {
       
       <Link href="/browse" className="text-center group">
         <div className="text-2xl md:text-3xl font-bold text-primary-500 group-hover:text-primary-600 transition-colors">
-          {categoriesCount}+
+          {uniqueContributors}+
         </div>
-        <div className="text-sm text-gray-500 group-hover:text-gray-700 transition-colors">Categories</div>
+        <div className="text-sm text-gray-500 group-hover:text-gray-700 transition-colors">Contributors</div>
       </Link>
     </div>
   )

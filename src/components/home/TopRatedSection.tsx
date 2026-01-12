@@ -66,13 +66,16 @@ export async function TopRatedSection() {
     <div>
       {/* Section Header */}
       <div className="flex items-center justify-between mb-6">
-        <div>
+        <Link 
+          href="/browse?sort=rated"
+          className="hover:text-primary-600 transition-colors"
+        >
           <div className="flex items-center gap-2">
             <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
             <h2 className="text-xl font-bold text-gray-900">Top Rated</h2>
           </div>
           <p className="text-sm text-gray-500 mt-1">Highest rated by the community</p>
-        </div>
+        </Link>
         <Link
           href="/browse?sort=rated"
           className="text-sm font-medium text-primary-600 hover:text-primary-700"

@@ -35,14 +35,20 @@ export async function TrendingSection() {
     <div>
       {/* Section Header */}
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
+        <Link 
+          href="/browse?sort=popular"
+          className="flex items-center gap-2 hover:text-primary-600 transition-colors"
+        >
           <TrendingUp className="h-5 w-5 text-gray-700" />
           <h2 className="text-xl font-bold text-gray-900">Trending Today</h2>
-        </div>
-        <div className="flex items-center gap-1 px-3 py-1 bg-orange-50 rounded-full">
+        </Link>
+        <Link
+          href="/browse?sort=popular"
+          className="flex items-center gap-1 px-3 py-1 bg-orange-50 rounded-full hover:bg-orange-100 transition-colors"
+        >
           <span className="text-sm font-medium text-primary-600">Hot</span>
           <Flame className="h-4 w-4 text-primary-500" />
-        </div>
+        </Link>
       </div>
       
       {/* Trending Cards */}
