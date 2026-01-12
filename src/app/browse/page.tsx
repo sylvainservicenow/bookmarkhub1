@@ -11,7 +11,6 @@ export default async function BrowsePage({
     q?: string
     tag?: string
     tags?: string
-    group?: string
     sort?: string
     rating?: string
   }>
@@ -20,7 +19,6 @@ export default async function BrowsePage({
   const query = params.q || ''
   const tag = params.tag || ''
   const tagsParam = params.tags || ''
-  const group = params.group || ''
   const sort = params.sort || 'recent'
   const minRating = params.rating ? parseInt(params.rating) : 0
   
@@ -29,8 +27,19 @@ export default async function BrowsePage({
   
   const supabase = await createClient()
   
-  // Get current user for favorites
+  // Get current user for favorites and private bookmarks
   const { data: { user } } = await supabase.auth.getUser()
+  
+  // Check if user is admin
+  let isAdmin = false
+  if (user) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    isAdmin = profile?.role === 'admin'
+  }
   
   // Get user's favorites
   let userFavorites: string[] = []
@@ -49,14 +58,8 @@ export default async function BrowsePage({
     .eq('status', 'active')
     .order('name')
   
-  // Get all groups for filter
-  const { data: allGroups } = await supabase
-    .from('groups')
-    .select('id, name')
-    .eq('status', 'active')
-    .order('name')
-  
-  // Build bookmarks query
+  // Build bookmarks query - public bookmarks visible to all
+  // Admins can see all, users can see public + their own private
   let bookmarksQuery = supabase
     .from('bookmarks')
     .select(`
@@ -66,7 +69,18 @@ export default async function BrowsePage({
       ratings(rating)
     `)
     .eq('status', 'active')
-    .eq('visibility', 'public')
+  
+  // Visibility filter: public bookmarks + user's own private bookmarks (if logged in)
+  // Admins see all
+  if (isAdmin) {
+    // Admins see everything
+  } else if (user) {
+    // Logged in users see public + their own private
+    bookmarksQuery = bookmarksQuery.or(`visibility.eq.public,creator_id.eq.${user.id}`)
+  } else {
+    // Anonymous users see only public
+    bookmarksQuery = bookmarksQuery.eq('visibility', 'public')
+  }
   
   // Text search
   if (query) {
@@ -196,7 +210,6 @@ export default async function BrowsePage({
               currentSort={sort}
               selectedTags={selectedTags}
               minRating={minRating}
-              groups={allGroups || []}
               searchParams={params}
               topContributors={topContributors}
             />
