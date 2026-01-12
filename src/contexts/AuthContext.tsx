@@ -42,17 +42,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!mountedRef.current) return null
     
     try {
+      // Use maybeSingle() to avoid 406 errors when profile doesn't exist yet
       const { data, error: profileError } = await supabase
         .from('users')
         .select('id, name, email, avatar_url, role, status, created_at')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
       
       if (profileError) {
-        // PGRST116 means no row found - user profile may not exist yet
-        if (profileError.code !== 'PGRST116') {
-          console.error('Profile fetch error:', profileError.message)
-        }
+        console.error('Profile fetch error:', profileError.message)
         return null
       }
       return data
