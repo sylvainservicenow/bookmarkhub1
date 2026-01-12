@@ -2,14 +2,12 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Clock, TrendingUp, Star, MessageSquare, X, FolderOpen } from 'lucide-react'
+import { Clock, TrendingUp, Star, MessageSquare, X } from 'lucide-react'
 
 interface FiltersSidebarProps {
   currentSort: string
   selectedTags: string[]
   minRating: number
-  groups: { id: string; name: string }[]
-  selectedGroup?: string
   searchParams: any
   topContributors: { id: string; name: string; count: number }[]
 }
@@ -18,8 +16,6 @@ export function FiltersSidebar({
   currentSort, 
   selectedTags, 
   minRating, 
-  groups,
-  selectedGroup,
   searchParams,
   topContributors 
 }: FiltersSidebarProps) {
@@ -54,7 +50,7 @@ export function FiltersSidebar({
     router.push('/browse')
   }
 
-  const hasFilters = selectedTags.length > 0 || minRating > 0 || selectedGroup
+  const hasFilters = selectedTags.length > 0 || minRating > 0
 
   return (
     <div className="space-y-6">
@@ -82,15 +78,6 @@ export function FiltersSidebar({
                 </button>
               </span>
             ))}
-            {selectedGroup && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-sm">
-                <FolderOpen className="h-3 w-3" />
-                Group filter
-                <button onClick={() => router.push(buildUrl({ group: undefined }))} className="hover:text-green-900">
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
             {minRating > 0 && (
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-sm">
                 {minRating}+ stars
@@ -127,41 +114,6 @@ export function FiltersSidebar({
           })}
         </div>
       </div>
-
-      {/* Groups Filter (only show if user has groups) */}
-      {groups.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-            <FolderOpen className="h-4 w-4" />
-            My Groups
-          </h3>
-          <div className="space-y-1">
-            <Link
-              href={buildUrl({ group: undefined })}
-              className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                !selectedGroup
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              All bookmarks
-            </Link>
-            {groups.map(group => (
-              <Link
-                key={group.id}
-                href={buildUrl({ group: group.id })}
-                className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                  selectedGroup === group.id
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {group.name}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Rating Filter */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
