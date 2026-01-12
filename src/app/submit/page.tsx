@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { createClient } from '@/lib/supabase/client'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Plus, X, Check, FolderOpen, Lock, Loader2, Sparkles } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Plus, X, Check, Lock, Loader2, Sparkles } from 'lucide-react'
 import { getFaviconUrl } from '@/lib/utils/favicon'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 
@@ -12,11 +12,6 @@ interface TagType {
   id: string
   name: string
   visibility: string
-}
-
-interface GroupType {
-  id: string
-  name: string
 }
 
 export default function SubmitPage() {
@@ -28,9 +23,7 @@ export default function SubmitPage() {
   const [availableTags, setAvailableTags] = useState<TagType[]>([])
   const [newTagName, setNewTagName] = useState('')
   const [customTags, setCustomTags] = useState<string[]>([])
-  const [visibility, setVisibility] = useState<'public' | 'restricted'>('public')
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
-  const [userGroups, setUserGroups] = useState<GroupType[]>([])
+  const [visibility, setVisibility] = useState<'public' | 'private'>('public')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -46,19 +39,6 @@ export default function SubmitPage() {
     if (!user) return
 
     const fetchData = async () => {
-      const { data: memberships } = await supabase
-        .from('group_members')
-        .select('group_id, groups(id, name, status)')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-      
-      if (memberships) {
-        const groups = memberships
-          .map((m: any) => m.groups)
-          .filter((g: any) => g && g.status === 'active')
-        setUserGroups(groups)
-      }
-
       const { data: tags } = await supabase
         .from('tags')
         .select('id, name, visibility')
@@ -167,14 +147,6 @@ export default function SubmitPage() {
     }
   }
 
-  const toggleGroup = (groupId: string) => {
-    setSelectedGroupIds(prev => 
-      prev.includes(groupId)
-        ? prev.filter(id => id !== groupId)
-        : [...prev, groupId]
-    )
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -190,12 +162,6 @@ export default function SubmitPage() {
       new URL(url)
     } catch {
       setError('Please enter a valid URL')
-      setLoading(false)
-      return
-    }
-
-    if (visibility === 'restricted' && selectedGroupIds.length === 0) {
-      setError('Please select at least one group for restricted bookmarks')
       setLoading(false)
       return
     }
@@ -232,14 +198,6 @@ export default function SubmitPage() {
       setError(bookmarkError.message)
       setLoading(false)
       return
-    }
-
-    if (visibility === 'restricted' && selectedGroupIds.length > 0 && bookmark) {
-      const groupInserts = selectedGroupIds.map(groupId => ({
-        bookmark_id: bookmark.id,
-        group_id: groupId,
-      }))
-      await supabase.from('bookmark_groups').insert(groupInserts)
     }
 
     if (selectedTags.length > 0 && bookmark) {
@@ -318,7 +276,6 @@ export default function SubmitPage() {
                 setSelectedTags([])
                 setCustomTags([])
                 setVisibility('public')
-                setSelectedGroupIds([])
                 setTitleFetched(false)
                 setFaviconUrl(null)
               }}
@@ -526,82 +483,38 @@ export default function SubmitPage() {
               <Globe className="h-4 w-4" />
               Visibility
             </label>
-            <div className="flex gap-4 mb-3">
+            <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
                   checked={visibility === 'public'}
-                  onChange={() => {
-                    setVisibility('public')
-                    setSelectedGroupIds([])
-                  }}
+                  onChange={() => setVisibility('public')}
                   disabled={loading}
                   className="text-primary-600 focus:ring-primary-500"
                 />
+                <Globe className="h-4 w-4 text-green-600" />
                 <span className="text-sm text-gray-700">Public</span>
+                <span className="text-xs text-gray-500">(visible to everyone)</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
-                  checked={visibility === 'restricted'}
-                  onChange={() => setVisibility('restricted')}
+                  checked={visibility === 'private'}
+                  onChange={() => setVisibility('private')}
                   disabled={loading}
                   className="text-primary-600 focus:ring-primary-500"
                 />
-                <span className="text-sm text-gray-700">Restricted</span>
+                <Lock className="h-4 w-4 text-amber-600" />
+                <span className="text-sm text-gray-700">Only me</span>
+                <span className="text-xs text-gray-500">(private)</span>
               </label>
             </div>
-            
-            {visibility === 'restricted' && (
-              <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg animate-fade-in">
-                <label className="flex items-center gap-2 text-sm font-medium text-amber-800 mb-2">
-                  <Lock className="h-4 w-4" />
-                  Select groups * (can select multiple)
-                </label>
-                {userGroups.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {userGroups.map(group => {
-                      const isSelected = selectedGroupIds.includes(group.id)
-                      return (
-                        <button
-                          key={group.id}
-                          type="button"
-                          onClick={() => toggleGroup(group.id)}
-                          disabled={loading}
-                          className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                            isSelected
-                              ? 'bg-amber-600 text-white'
-                              : 'bg-white border border-amber-300 text-amber-800 hover:border-amber-500'
-                          } disabled:opacity-50`}
-                        >
-                          <FolderOpen className="h-4 w-4" />
-                          {group.name}
-                          {isSelected && <Check className="h-3 w-3" />}
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-amber-700 text-sm">
-                    You are not a member of any groups yet.{' '}
-                    <a href="/groups" className="underline hover:text-amber-900">
-                      Browse groups to join
-                    </a>
-                  </p>
-                )}
-                {selectedGroupIds.length > 0 && (
-                  <p className="text-xs text-amber-600 mt-2">
-                    {selectedGroupIds.length} group{selectedGroupIds.length !== 1 ? 's' : ''} selected
-                  </p>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Submit */}
           <button
             type="submit"
-            disabled={loading || (visibility === 'restricted' && selectedGroupIds.length === 0)}
+            disabled={loading}
             className="w-full py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
             {loading ? (
