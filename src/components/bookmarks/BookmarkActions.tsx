@@ -13,7 +13,10 @@ interface BookmarkActionsProps {
 }
 
 export function BookmarkActions({ bookmarkId, bookmarkUrl, isArchived, isCreator }: BookmarkActionsProps) {
-  const { user, loading } = useAuth()
+  const { user, profile, loading } = useAuth()
+  
+  const isAdmin = profile?.role === 'admin'
+  const canEdit = isCreator || isAdmin
 
   if (isArchived) {
     return null
@@ -35,8 +38,8 @@ export function BookmarkActions({ bookmarkId, bookmarkUrl, isArchived, isCreator
         </Link>
       )}
       
-      {/* Edit button for creator */}
-      {isCreator && (
+      {/* Edit button for creator or admin */}
+      {canEdit && (
         <Link
           href={`/bookmarks/${bookmarkId}/edit`}
           className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
