@@ -29,7 +29,7 @@ export default function SubmitPage() {
   const [newTagName, setNewTagName] = useState('')
   const [customTags, setCustomTags] = useState<string[]>([])
   const [visibility, setVisibility] = useState<'public' | 'restricted'>('public')
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
   const [userGroups, setUserGroups] = useState<GroupType[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -46,7 +46,6 @@ export default function SubmitPage() {
     if (!user) return
 
     const fetchData = async () => {
-      // Fetch user's groups
       const { data: memberships } = await supabase
         .from('group_members')
         .select('group_id, groups(id, name, status)')
@@ -60,7 +59,6 @@ export default function SubmitPage() {
         setUserGroups(groups)
       }
 
-      // Fetch tags
       const { data: tags } = await supabase
         .from('tags')
         .select('id, name, visibility')
@@ -76,7 +74,6 @@ export default function SubmitPage() {
     fetchData()
   }, [user, supabase])
 
-  // Update favicon when URL changes
   useEffect(() => {
     if (url) {
       const favicon = getFaviconUrl(url)
@@ -86,7 +83,6 @@ export default function SubmitPage() {
     }
   }, [url])
 
-  // Debounced fetch title function
   const fetchPageTitle = useCallback(async (urlToFetch: string) => {
     try {
       new URL(urlToFetch)
@@ -121,7 +117,6 @@ export default function SubmitPage() {
     }
   }, [title, description])
 
-  // Auto-fetch title when URL changes (with debounce)
   useEffect(() => {
     if (!url) {
       setTitleFetched(false)
@@ -172,6 +167,14 @@ export default function SubmitPage() {
     }
   }
 
+  const toggleGroup = (groupId: string) => {
+    setSelectedGroupIds(prev => 
+      prev.includes(groupId)
+        ? prev.filter(id => id !== groupId)
+        : [...prev, groupId]
+    )
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -191,8 +194,8 @@ export default function SubmitPage() {
       return
     }
 
-    if (visibility === 'restricted' && !selectedGroupId) {
-      setError('Please select a group for restricted bookmarks')
+    if (visibility === 'restricted' && selectedGroupIds.length === 0) {
+      setError('Please select at least one group for restricted bookmarks')
       setLoading(false)
       return
     }
@@ -231,13 +234,12 @@ export default function SubmitPage() {
       return
     }
 
-    if (visibility === 'restricted' && selectedGroupId && bookmark) {
-      await supabase
-        .from('bookmark_groups')
-        .insert({
-          bookmark_id: bookmark.id,
-          group_id: selectedGroupId,
-        })
+    if (visibility === 'restricted' && selectedGroupIds.length > 0 && bookmark) {
+      const groupInserts = selectedGroupIds.map(groupId => ({
+        bookmark_id: bookmark.id,
+        group_id: groupId,
+      }))
+      await supabase.from('bookmark_groups').insert(groupInserts)
     }
 
     if (selectedTags.length > 0 && bookmark) {
@@ -294,7 +296,7 @@ export default function SubmitPage() {
   }
 
   if (!user) {
-    return null // Middleware will redirect
+    return null
   }
 
   if (success) {
@@ -305,9 +307,7 @@ export default function SubmitPage() {
             <BookmarkIcon className="h-8 w-8 text-green-600" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Bookmark Submitted!</h1>
-          <p className="text-gray-600 mb-6">
-            Your bookmark has been added successfully.
-          </p>
+          <p className="text-gray-600 mb-6">Your bookmark has been added successfully.</p>
           <div className="flex gap-3 justify-center">
             <button
               onClick={() => {
@@ -318,7 +318,7 @@ export default function SubmitPage() {
                 setSelectedTags([])
                 setCustomTags([])
                 setVisibility('public')
-                setSelectedGroupId(null)
+                setSelectedGroupIds([])
                 setTitleFetched(false)
                 setFaviconUrl(null)
               }}
@@ -533,7 +533,7 @@ export default function SubmitPage() {
                   checked={visibility === 'public'}
                   onChange={() => {
                     setVisibility('public')
-                    setSelectedGroupId(null)
+                    setSelectedGroupIds([])
                   }}
                   disabled={loading}
                   className="text-primary-600 focus:ring-primary-500"
@@ -556,27 +556,30 @@ export default function SubmitPage() {
               <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg animate-fade-in">
                 <label className="flex items-center gap-2 text-sm font-medium text-amber-800 mb-2">
                   <Lock className="h-4 w-4" />
-                  Select a group *
+                  Select groups * (can select multiple)
                 </label>
                 {userGroups.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {userGroups.map(group => (
-                      <button
-                        key={group.id}
-                        type="button"
-                        onClick={() => setSelectedGroupId(group.id)}
-                        disabled={loading}
-                        className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                          selectedGroupId === group.id
-                            ? 'bg-amber-600 text-white'
-                            : 'bg-white border border-amber-300 text-amber-800 hover:border-amber-500'
-                        } disabled:opacity-50`}
-                      >
-                        <FolderOpen className="h-4 w-4" />
-                        {group.name}
-                        {selectedGroupId === group.id && <Check className="h-3 w-3" />}
-                      </button>
-                    ))}
+                    {userGroups.map(group => {
+                      const isSelected = selectedGroupIds.includes(group.id)
+                      return (
+                        <button
+                          key={group.id}
+                          type="button"
+                          onClick={() => toggleGroup(group.id)}
+                          disabled={loading}
+                          className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                            isSelected
+                              ? 'bg-amber-600 text-white'
+                              : 'bg-white border border-amber-300 text-amber-800 hover:border-amber-500'
+                          } disabled:opacity-50`}
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                          {group.name}
+                          {isSelected && <Check className="h-3 w-3" />}
+                        </button>
+                      )
+                    })}
                   </div>
                 ) : (
                   <p className="text-amber-700 text-sm">
@@ -586,6 +589,11 @@ export default function SubmitPage() {
                     </a>
                   </p>
                 )}
+                {selectedGroupIds.length > 0 && (
+                  <p className="text-xs text-amber-600 mt-2">
+                    {selectedGroupIds.length} group{selectedGroupIds.length !== 1 ? 's' : ''} selected
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -593,7 +601,7 @@ export default function SubmitPage() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={loading || (visibility === 'restricted' && !selectedGroupId)}
+            disabled={loading || (visibility === 'restricted' && selectedGroupIds.length === 0)}
             className="w-full py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
             {loading ? (
