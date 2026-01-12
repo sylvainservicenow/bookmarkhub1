@@ -33,12 +33,20 @@ export function RequestJoinButton({ groupId, groupName, hasSecretCode }: Request
     }
 
     // Check if already a member or has pending request
-    const { data: existing } = await supabase
+    // Use maybeSingle() to avoid 406 error when no membership exists
+    const { data: existing, error: checkError } = await supabase
       .from('group_members')
       .select('id, status')
       .eq('group_id', groupId)
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
+
+    if (checkError) {
+      console.error('Error checking membership:', checkError)
+      setError('Failed to check membership status')
+      setLoading(false)
+      return
+    }
 
     if (existing) {
       if (existing.status === 'pending') {
@@ -57,7 +65,7 @@ export function RequestJoinButton({ groupId, groupName, hasSecretCode }: Request
         .from('groups')
         .select('secret_code')
         .eq('id', groupId)
-        .single()
+        .maybeSingle()
       
       if (group?.secret_code && group.secret_code.toUpperCase() === secretCode.toUpperCase()) {
         autoApprove = true
