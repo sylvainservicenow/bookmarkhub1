@@ -15,7 +15,7 @@ interface TagType {
 export default function EditBookmarkPage() {
   const params = useParams()
   const bookmarkId = params.id as string
-  const { user, loading: authLoading } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
   
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
@@ -27,7 +27,9 @@ export default function EditBookmarkPage() {
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [permissionDenied, setPermissionDenied] = useState(false)
   const mountedRef = useRef(true)
+  const fetchedRef = useRef(false)
   const router = useRouter()
   const [supabase] = useState(() => createClient())
 
@@ -35,20 +37,48 @@ export default function EditBookmarkPage() {
     mountedRef.current = true
     
     const init = async () => {
-      if (!user) return
+      // Prevent double-fetching
+      if (fetchedRef.current) return
+      
+      if (!user) {
+        // If auth is done loading and no user, redirect to login
+        if (!authLoading) {
+          router.push(`/login?redirect=/bookmarks/${bookmarkId}/edit`)
+        }
+        return
+      }
+
+      fetchedRef.current = true
 
       try {
+        // First, fetch the bookmark without creator restriction
         const { data: bookmark, error: bookmarkError } = await supabase
           .from('bookmarks')
           .select('*, bookmark_tags (tag_id)')
           .eq('id', bookmarkId)
-          .eq('creator_id', user.id)
-          .single()
+          .maybeSingle()
 
         if (!mountedRef.current) return
 
-        if (bookmarkError || !bookmark) {
+        if (bookmarkError) {
+          console.error('Error fetching bookmark:', bookmarkError)
+          setError('Failed to load bookmark')
+          setInitialLoading(false)
+          return
+        }
+
+        if (!bookmark) {
           setNotFound(true)
+          setInitialLoading(false)
+          return
+        }
+
+        // Check permission: must be creator OR admin
+        const isCreator = bookmark.creator_id === user.id
+        const isAdmin = profile?.role === 'admin'
+        
+        if (!isCreator && !isAdmin) {
+          setPermissionDenied(true)
           setInitialLoading(false)
           return
         }
@@ -75,11 +105,17 @@ export default function EditBookmarkPage() {
       }
     }
 
-    if (!authLoading && user) init()
-    else if (!authLoading && !user) setInitialLoading(false)
+    if (!authLoading) {
+      init()
+    }
     
     return () => { mountedRef.current = false }
-  }, [bookmarkId, user, authLoading, supabase])
+  }, [bookmarkId, user, profile, authLoading, supabase, router])
+
+  // Reset fetchedRef when bookmarkId changes
+  useEffect(() => {
+    fetchedRef.current = false
+  }, [bookmarkId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -100,7 +136,9 @@ export default function EditBookmarkPage() {
     if (selectedTags.length > 0) {
       await supabase.from('bookmark_tags').insert(selectedTags.map(tagId => ({ bookmark_id: bookmarkId, tag_id: tagId })))
     }
-    router.push('/bookmarks')
+    
+    // Navigate back to the bookmark detail page
+    router.push(`/bookmark/${bookmarkId}`)
   }
 
   const toggleTag = (tagId: string) => setSelectedTags(prev => prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId])
@@ -113,7 +151,20 @@ export default function EditBookmarkPage() {
     )
   }
 
-  if (!user) return null
+  if (!user) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <div className="text-center">
+          <BookmarkIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Sign in required</h1>
+          <p className="text-gray-600 mb-4">Please sign in to edit bookmarks.</p>
+          <Link href={`/login?redirect=/bookmarks/${bookmarkId}/edit`} className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
+            Sign in
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   if (notFound) {
     return (
@@ -121,9 +172,24 @@ export default function EditBookmarkPage() {
         <div className="text-center">
           <BookmarkIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
           <h1 className="text-xl font-bold text-gray-900 mb-2">Bookmark not found</h1>
-          <p className="text-gray-600 mb-4">This bookmark doesn&apos;t exist or you don&apos;t have permission.</p>
-          <Link href="/bookmarks" className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium">
-            <ArrowLeft className="h-4 w-4" />Back to Bookmarks
+          <p className="text-gray-600 mb-4">This bookmark doesn&apos;t exist or has been deleted.</p>
+          <Link href="/dashboard" className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium">
+            <ArrowLeft className="h-4 w-4" />Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (permissionDenied) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <div className="text-center">
+          <BookmarkIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Permission denied</h1>
+          <p className="text-gray-600 mb-4">You don&apos;t have permission to edit this bookmark.</p>
+          <Link href={`/bookmark/${bookmarkId}`} className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium">
+            <ArrowLeft className="h-4 w-4" />Back to Bookmark
           </Link>
         </div>
       </div>
@@ -133,8 +199,8 @@ export default function EditBookmarkPage() {
   return (
     <div className="min-h-[calc(100vh-64px)] py-8 px-4 animate-fade-in">
       <div className="max-w-2xl mx-auto">
-        <Link href="/bookmarks" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors">
-          <ArrowLeft className="h-4 w-4" />Back to Bookmarks
+        <Link href={`/bookmark/${bookmarkId}`} className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors">
+          <ArrowLeft className="h-4 w-4" />Back to Bookmark
         </Link>
 
         <div className="text-center mb-8">
@@ -194,7 +260,7 @@ export default function EditBookmarkPage() {
               className="flex-1 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-70 transition-all flex items-center justify-center gap-2">
               {loading ? <><Loader2 className="h-5 w-5 animate-spin" />Saving...</> : <><Save className="h-5 w-5" />Save Changes</>}
             </button>
-            <Link href="/bookmarks" className="px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors">Cancel</Link>
+            <Link href={`/bookmark/${bookmarkId}`} className="px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors">Cancel</Link>
           </div>
         </form>
       </div>
