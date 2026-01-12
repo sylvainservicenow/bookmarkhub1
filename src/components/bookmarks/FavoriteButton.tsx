@@ -23,18 +23,23 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
     if (!mountedRef.current) return
     
     try {
-      const { data } = await supabase
+      // Use maybeSingle() instead of single() to handle 0 rows gracefully
+      const { data, error } = await supabase
         .from('favorites')
         .select('id')
         .eq('user_id', userId)
         .eq('bookmark_id', bookmarkId)
-        .single()
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error checking favorite status:', error)
+      }
 
       if (mountedRef.current) {
         setIsFavorited(!!data)
       }
     } catch (err) {
-      // Silently handle - PGRST116 means no favorite found
+      console.error('Unexpected error checking favorite:', err)
     } finally {
       if (mountedRef.current) {
         setLoading(false)
