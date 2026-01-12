@@ -5,6 +5,7 @@ import './globals.css'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { NavigationProgress } from '@/components/layout/NavigationProgress'
+import { AuthProvider } from '@/contexts/AuthContext'
 
 const dmSans = DM_Sans({ 
   subsets: ['latin'],
@@ -25,12 +26,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${dmSans.className} antialiased`}>
-        <Suspense fallback={null}>
-          <NavigationProgress />
-        </Suspense>
-        <Header />
-        <main className="animate-fade-in">{children}</main>
-        <Footer />
+        <AuthProvider>
+          <Suspense fallback={null}>
+            <NavigationProgress />
+          </Suspense>
+          <Header />
+          <main className="animate-fade-in">{children}</main>
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   )

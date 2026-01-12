@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { useAuth } from '@/contexts/AuthContext'
 import { BookmarkIcon, Mail, Loader2, CheckCircle, LogIn } from 'lucide-react'
 
 function LoginForm() {
@@ -15,10 +16,19 @@ function LoginForm() {
   const [showResendOption, setShowResendOption] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendSuccess, setResendSuccess] = useState(false)
+  
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user, loading: authLoading } = useAuth()
   const redirect = searchParams.get('redirect') || '/dashboard'
   const supabase = createClient()
+
+  // If already logged in, redirect
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push(redirect)
+    }
+  }, [user, authLoading, router, redirect])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,7 +75,7 @@ function LoginForm() {
             return
           }
         } catch (profileError) {
-          // If profile check fails, still allow login (profile might not exist yet)
+          // If profile check fails, still allow login
           console.error('Profile check failed:', profileError)
         }
       }
@@ -73,7 +83,8 @@ function LoginForm() {
       // Show success state before redirect
       setSuccess(true)
       
-      // Small delay to show success, then redirect
+      // The AuthContext will handle the state update
+      // Just redirect after a brief success display
       setTimeout(() => {
         router.push(redirect)
         router.refresh()
@@ -111,6 +122,25 @@ function LoginForm() {
     }
 
     setResendLoading(false)
+  }
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+      </div>
+    )
+  }
+
+  // Don't show form if already logged in (will redirect)
+  if (user) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+        <span className="ml-2 text-gray-600">Redirecting...</span>
+      </div>
+    )
   }
 
   return (

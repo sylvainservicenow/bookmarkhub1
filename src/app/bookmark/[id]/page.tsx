@@ -6,6 +6,7 @@ import { FavoriteButton } from '@/components/bookmarks/FavoriteButton'
 import { RatingStars } from '@/components/bookmarks/RatingStars'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 import { CommentSection } from '@/components/comments/CommentSection'
+import { BookmarkActions } from '@/components/bookmarks/BookmarkActions'
 
 export default async function BookmarkPage({
   params,
@@ -15,7 +16,7 @@ export default async function BookmarkPage({
   const { id } = await params
   const supabase = await createClient()
 
-  // Get current user (server-side - for isCreator check only)
+  // Get current user (server-side)
   const { data: { user } } = await supabase.auth.getUser()
   
   // Check if user is admin
@@ -78,7 +79,7 @@ export default async function BookmarkPage({
       {/* Back link */}
       <Link
         href="/dashboard"
-        className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
+        className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to Dashboard
@@ -104,30 +105,14 @@ export default async function BookmarkPage({
             />
             <h1 className="text-2xl font-bold text-gray-900">{bookmark.title}</h1>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {!isArchived && <FavoriteButton bookmarkId={bookmark.id} />}
-            {/* Edit button for creator */}
-            {isCreator && !isArchived && (
-              <Link
-                href={`/bookmarks/${bookmark.id}/edit`}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                <Pencil className="h-4 w-4" />
-                Edit
-              </Link>
-            )}
-            {!isArchived && (
-              <a
-                href={bookmark.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Visit
-              </a>
-            )}
-          </div>
+          
+          {/* Actions - Client component handles auth state */}
+          <BookmarkActions 
+            bookmarkId={bookmark.id}
+            bookmarkUrl={bookmark.url}
+            isArchived={isArchived}
+            isCreator={isCreator || false}
+          />
         </div>
 
         {/* URL */}
@@ -152,7 +137,7 @@ export default async function BookmarkPage({
               <Link
                 key={tag.id}
                 href={`/search?tag=${encodeURIComponent(tag.name)}`}
-                className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full hover:bg-gray-200"
+                className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full hover:bg-gray-200 transition-colors"
               >
                 {tag.name}
               </Link>
@@ -160,7 +145,7 @@ export default async function BookmarkPage({
           </div>
         )}
 
-        {/* Rating Section */}
+        {/* Rating Section - Client component handles auth */}
         {!isArchived && (
           <div className="mt-6 pt-6 border-t border-gray-200">
             <h2 className="text-sm font-medium text-gray-700 mb-3">Rate this bookmark</h2>
@@ -177,7 +162,7 @@ export default async function BookmarkPage({
           {domain && (
             <Link 
               href={`/search?domain=${encodeURIComponent(domain)}`}
-              className="flex items-center gap-2 hover:text-primary-600"
+              className="flex items-center gap-2 hover:text-primary-600 transition-colors"
             >
               <Globe className="h-4 w-4" />
               {domain}

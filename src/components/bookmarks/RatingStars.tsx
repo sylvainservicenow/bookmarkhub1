@@ -1,148 +1,130 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Star } from 'lucide-react'
-import { User } from '@supabase/supabase-js'
+import { useAuth } from '@/contexts/AuthContext'
+import { Star, Loader2 } from 'lucide-react'
 
 interface RatingStarsProps {
   bookmarkId: string
-  initialRating?: number
-  totalRatings?: number
-  averageRating?: number
+  totalRatings: number
+  averageRating: number
 }
 
-export function RatingStars({ bookmarkId, initialRating, totalRatings = 0, averageRating }: RatingStarsProps) {
-  const [userRating, setUserRating] = useState<number | null>(initialRating ?? null)
-  const [hoveredRating, setHoveredRating] = useState<number | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [checkingAuth, setCheckingAuth] = useState(true)
-  const [user, setUser] = useState<User | null>(null)
-  const router = useRouter()
+export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingStarsProps) {
+  const { user } = useAuth()
+  const [userRating, setUserRating] = useState<number | null>(null)
+  const [hoverRating, setHoverRating] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [currentAverage, setCurrentAverage] = useState(averageRating)
+  const [currentTotal, setCurrentTotal] = useState(totalRatings)
   const [supabase] = useState(() => createClient())
+  const mountedRef = useRef(true)
 
   const fetchUserRating = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('ratings')
-      .select('rating')
-      .eq('bookmark_id', bookmarkId)
-      .eq('user_id', userId)
-      .single()
+    if (!mountedRef.current) return
     
-    if (data) {
-      setUserRating(data.rating)
+    try {
+      const { data } = await supabase
+        .from('ratings')
+        .select('rating')
+        .eq('bookmark_id', bookmarkId)
+        .eq('user_id', userId)
+        .single()
+
+      if (mountedRef.current && data) {
+        setUserRating(data.rating)
+      }
+    } catch (err) {
+      // No rating found is fine
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false)
+      }
     }
   }, [supabase, bookmarkId])
 
   useEffect(() => {
-    let mounted = true
+    mountedRef.current = true
 
-    const initAuth = async () => {
-      try {
-        // Use getUser() instead of getSession() for more reliable auth state
-        const { data: { user: currentUser }, error } = await supabase.auth.getUser()
-        
-        if (error) {
-          console.error('RatingStars auth error:', error)
-        }
-        
-        if (!mounted) return
-        
-        setUser(currentUser)
-        
-        if (currentUser) {
-          await fetchUserRating(currentUser.id)
-        }
-      } catch (err) {
-        console.error('RatingStars init error:', err)
-      } finally {
-        if (mounted) {
-          setCheckingAuth(false)
-        }
-      }
+    if (user) {
+      fetchUserRating(user.id)
+    } else {
+      setLoading(false)
     }
-    
-    initAuth()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!mounted) return
-      
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        await fetchUserRating(session.user.id)
-      } else {
-        setUserRating(null)
-      }
-    })
 
     return () => {
-      mounted = false
-      subscription.unsubscribe()
+      mountedRef.current = false
     }
-  }, [supabase, fetchUserRating])
+  }, [user, fetchUserRating])
 
   const handleRate = async (rating: number) => {
     if (!user) {
-      router.push(`/login?redirect=/bookmark/${bookmarkId}`)
+      window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
       return
     }
 
-    setLoading(true)
+    setSaving(true)
 
     try {
-      // Check if user already rated
-      const { data: existingRating } = await supabase
-        .from('ratings')
-        .select('id')
-        .eq('bookmark_id', bookmarkId)
-        .eq('user_id', user.id)
-        .single()
-
-      if (existingRating) {
+      if (userRating) {
         // Update existing rating
-        await supabase
+        const { error } = await supabase
           .from('ratings')
-          .update({ rating, updated_at: new Date().toISOString() })
-          .eq('id', existingRating.id)
+          .update({ rating })
+          .eq('bookmark_id', bookmarkId)
+          .eq('user_id', user.id)
+        
+        if (error) throw error
+
+        // Recalculate average (approximate - replace old with new)
+        const newTotal = (currentAverage * currentTotal - userRating + rating) / currentTotal
+        setCurrentAverage(newTotal)
       } else {
-        // Create new rating
-        await supabase
+        // Insert new rating
+        const { error } = await supabase
           .from('ratings')
           .insert({
             bookmark_id: bookmarkId,
             user_id: user.id,
             rating,
           })
+        
+        if (error) throw error
+
+        // Recalculate average
+        const newTotal = currentTotal + 1
+        const newAverage = (currentAverage * currentTotal + rating) / newTotal
+        setCurrentAverage(newAverage)
+        setCurrentTotal(newTotal)
       }
 
       setUserRating(rating)
-      router.refresh()
     } catch (err) {
       console.error('Rating error:', err)
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
-  const displayRating = hoveredRating ?? userRating ?? 0
-  const isLoggedIn = !!user
+  const displayRating = hoverRating ?? userRating ?? 0
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex items-center gap-4">
       {/* Interactive stars */}
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <button
             key={star}
             onClick={() => handleRate(star)}
-            onMouseEnter={() => setHoveredRating(star)}
-            onMouseLeave={() => setHoveredRating(null)}
-            disabled={loading || checkingAuth}
-            className="p-0.5 transition-transform hover:scale-110 disabled:opacity-50"
-            title={`Rate ${star} star${star !== 1 ? 's' : ''}`}
+            onMouseEnter={() => user && setHoverRating(star)}
+            onMouseLeave={() => setHoverRating(null)}
+            disabled={loading || saving || !user}
+            className={`p-1 transition-all duration-150 ${
+              user ? 'hover:scale-110 cursor-pointer' : 'cursor-default'
+            } disabled:opacity-50`}
+            title={user ? `Rate ${star} star${star > 1 ? 's' : ''}` : 'Sign in to rate'}
           >
             <Star
               className={`h-6 w-6 transition-colors ${
@@ -153,38 +135,27 @@ export function RatingStars({ bookmarkId, initialRating, totalRatings = 0, avera
             />
           </button>
         ))}
-        
-        {(loading || checkingAuth) && (
-          <span className="ml-2 text-sm text-gray-400">
-            {checkingAuth ? 'Checking...' : 'Saving...'}
-          </span>
-        )}
+        {saving && <Loader2 className="h-4 w-4 animate-spin text-gray-400 ml-2" />}
       </div>
 
       {/* Rating info */}
       <div className="text-sm text-gray-500">
-        {averageRating !== undefined && averageRating > 0 ? (
-          <span>
-            <span className="font-medium text-gray-700">{averageRating.toFixed(1)}</span>
-            {' '}average · {totalRatings} rating{totalRatings !== 1 ? 's' : ''}
-          </span>
-        ) : (
-          <span>No ratings yet</span>
-        )}
+        <span className="font-medium text-gray-700">{currentAverage.toFixed(1)}</span>
+        <span className="mx-1">·</span>
+        <span>{currentTotal} rating{currentTotal !== 1 ? 's' : ''}</span>
         {userRating && (
-          <span className="ml-2 text-primary-600">
-            · Your rating: {userRating}
-          </span>
+          <span className="ml-2 text-primary-600">(You: {userRating}★)</span>
         )}
       </div>
 
-      {!checkingAuth && !isLoggedIn && (
-        <p className="text-xs text-gray-400">
-          <a href={`/login?redirect=/bookmark/${bookmarkId}`} className="text-primary-600 hover:underline">
-            Log in
-          </a>
-          {' '}to rate this bookmark
-        </p>
+      {/* Sign in prompt */}
+      {!user && !loading && (
+        <a 
+          href={`/login?redirect=${encodeURIComponent(window.location.pathname)}`}
+          className="text-sm text-primary-600 hover:underline"
+        >
+          Sign in to rate
+        </a>
       )}
     </div>
   )

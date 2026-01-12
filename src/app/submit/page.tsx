@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Plus, X, Check, FolderOpen, Lock, Loader2, Sparkles } from 'lucide-react'
 import { getFaviconUrl } from '@/lib/utils/favicon'
@@ -19,6 +20,7 @@ interface GroupType {
 }
 
 export default function SubmitPage() {
+  const { user, loading: authLoading } = useAuth()
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -32,23 +34,18 @@ export default function SubmitPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [user, setUser] = useState<any>(null)
   const [fetchingTitle, setFetchingTitle] = useState(false)
   const [titleFetched, setTitleFetched] = useState(false)
   const [faviconUrl, setFaviconUrl] = useState<string | null>(null)
+  const [dataLoading, setDataLoading] = useState(true)
   
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login?redirect=/submit')
-        return
-      }
-      setUser(user)
-      
+    if (!user) return
+
+    const fetchData = async () => {
       // Fetch user's groups
       const { data: memberships } = await supabase
         .from('group_members')
@@ -62,20 +59,22 @@ export default function SubmitPage() {
           .filter((g: any) => g && g.status === 'active')
         setUserGroups(groups)
       }
-    }
-    checkUser()
 
-    const fetchTags = async () => {
-      const { data } = await supabase
+      // Fetch tags
+      const { data: tags } = await supabase
         .from('tags')
         .select('id, name, visibility')
         .eq('visibility', 'public')
         .eq('status', 'active')
         .order('name')
-      if (data) setAvailableTags(data)
+      
+      if (tags) setAvailableTags(tags)
+      
+      setDataLoading(false)
     }
-    fetchTags()
-  }, [supabase, router])
+
+    fetchData()
+  }, [user, supabase])
 
   // Update favicon when URL changes
   useEffect(() => {
@@ -89,7 +88,6 @@ export default function SubmitPage() {
 
   // Debounced fetch title function
   const fetchPageTitle = useCallback(async (urlToFetch: string) => {
-    // Validate URL first
     try {
       new URL(urlToFetch)
     } catch {
@@ -130,12 +128,11 @@ export default function SubmitPage() {
       return
     }
 
-    // Only fetch if title is empty
     if (title) return
 
     const timeoutId = setTimeout(() => {
       fetchPageTitle(url)
-    }, 800) // Wait 800ms after user stops typing
+    }, 800)
 
     return () => clearTimeout(timeoutId)
   }, [url, fetchPageTitle, title])
@@ -144,12 +141,10 @@ export default function SubmitPage() {
     const trimmedTag = newTagName.trim()
     if (!trimmedTag) return
     
-    // Check if tag already exists in available tags
     const existingTag = availableTags.find(
       t => t.name.toLowerCase() === trimmedTag.toLowerCase()
     )
     if (existingTag) {
-      // Select the existing tag instead
       if (!selectedTags.includes(existingTag.id)) {
         setSelectedTags(prev => [...prev, existingTag.id])
       }
@@ -157,7 +152,6 @@ export default function SubmitPage() {
       return
     }
     
-    // Check if already in custom tags
     if (customTags.some(t => t.toLowerCase() === trimmedTag.toLowerCase())) {
       setNewTagName('')
       return
@@ -189,7 +183,6 @@ export default function SubmitPage() {
       return
     }
 
-    // Validate URL
     try {
       new URL(url)
     } catch {
@@ -198,14 +191,12 @@ export default function SubmitPage() {
       return
     }
 
-    // Validate restricted requires group
     if (visibility === 'restricted' && !selectedGroupId) {
       setError('Please select a group for restricted bookmarks')
       setLoading(false)
       return
     }
 
-    // Check if URL already exists
     const { data: existing } = await supabase
       .from('bookmarks')
       .select('id')
@@ -218,10 +209,8 @@ export default function SubmitPage() {
       return
     }
 
-    // Generate favicon URL
     const bookmarkFaviconUrl = getFaviconUrl(url)
 
-    // Create bookmark with favicon_url
     const { data: bookmark, error: bookmarkError } = await supabase
       .from('bookmarks')
       .insert({
@@ -242,21 +231,15 @@ export default function SubmitPage() {
       return
     }
 
-    // If restricted, add to bookmark_groups junction table
     if (visibility === 'restricted' && selectedGroupId && bookmark) {
-      const { error: groupError } = await supabase
+      await supabase
         .from('bookmark_groups')
         .insert({
           bookmark_id: bookmark.id,
           group_id: selectedGroupId,
         })
-      
-      if (groupError) {
-        console.error('Error adding bookmark to group:', groupError)
-      }
     }
 
-    // Add existing tags
     if (selectedTags.length > 0 && bookmark) {
       const tagInserts = selectedTags.map(tagId => ({
         bookmark_id: bookmark.id,
@@ -265,7 +248,6 @@ export default function SubmitPage() {
       await supabase.from('bookmark_tags').insert(tagInserts)
     }
 
-    // Create and add custom tags
     if (customTags.length > 0 && bookmark) {
       for (const tagName of customTags) {
         const { data: newTag } = await supabase
@@ -300,10 +282,25 @@ export default function SubmitPage() {
     )
   }
 
+  if (authLoading || dataLoading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null // Middleware will redirect
+  }
+
   if (success) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4">
-        <div className="w-full max-w-md text-center">
+        <div className="w-full max-w-md text-center animate-fade-in">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <BookmarkIcon className="h-8 w-8 text-green-600" />
           </div>
@@ -325,13 +322,13 @@ export default function SubmitPage() {
                 setTitleFetched(false)
                 setFaviconUrl(null)
               }}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
             >
               Submit Another
             </button>
             <button
               onClick={() => router.push('/dashboard')}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
             >
               Go to Dashboard
             </button>
@@ -342,7 +339,7 @@ export default function SubmitPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] py-8 px-4">
+    <div className="min-h-[calc(100vh-64px)] py-8 px-4 animate-fade-in">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
           <BookmarkIcon className="h-12 w-12 text-primary-600 mx-auto mb-4" />
@@ -352,7 +349,7 @@ export default function SubmitPage() {
 
         <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
           {error && (
-            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">
+            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm animate-fade-in">
               {error}
             </div>
           )}
@@ -375,8 +372,9 @@ export default function SubmitPage() {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 required
+                disabled={loading}
                 placeholder="https://example.com/article"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:bg-gray-50 transition-colors"
               />
             </div>
             {fetchingTitle && (
@@ -408,8 +406,9 @@ export default function SubmitPage() {
                 setTitleFetched(false)
               }}
               required
+              disabled={loading}
               placeholder="A descriptive title for this bookmark"
-              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none ${
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:bg-gray-50 transition-colors ${
                 titleFetched ? 'border-green-300 bg-green-50' : 'border-gray-300'
               }`}
             />
@@ -426,8 +425,9 @@ export default function SubmitPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
+              disabled={loading}
               placeholder="Optional: Add a brief description"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none disabled:bg-gray-50 transition-colors"
             />
           </div>
 
@@ -443,7 +443,6 @@ export default function SubmitPage() {
               )}
             </label>
             
-            {/* Select existing tags */}
             <div className="mb-4">
               <p className="text-xs text-gray-500 mb-2">Select from existing tags:</p>
               <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg max-h-40 overflow-y-auto">
@@ -455,11 +454,12 @@ export default function SubmitPage() {
                         key={tag.id}
                         type="button"
                         onClick={() => toggleTag(tag.id)}
+                        disabled={loading}
                         className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm transition-colors ${
                           isSelected
                             ? 'bg-primary-600 text-white'
                             : 'bg-white border border-gray-300 text-gray-700 hover:border-primary-400 hover:text-primary-600'
-                        }`}
+                        } disabled:opacity-50`}
                       >
                         {tag.name}
                         {isSelected && <Check className="h-3 w-3" />}
@@ -472,7 +472,6 @@ export default function SubmitPage() {
               </div>
             </div>
 
-            {/* Custom tags display */}
             {customTags.length > 0 && (
               <div className="mb-4">
                 <p className="text-xs text-gray-500 mb-2">New tags to create:</p>
@@ -496,7 +495,6 @@ export default function SubmitPage() {
               </div>
             )}
 
-            {/* Add new tag input */}
             <div>
               <p className="text-xs text-gray-500 mb-2">Or create a new tag:</p>
               <div className="flex gap-2">
@@ -505,13 +503,14 @@ export default function SubmitPage() {
                   value={newTagName}
                   onChange={(e) => setNewTagName(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  disabled={loading}
                   placeholder="Type a new tag name..."
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm disabled:bg-gray-50 transition-colors"
                 />
                 <button
                   type="button"
                   onClick={handleAddCustomTag}
-                  disabled={!newTagName.trim()}
+                  disabled={!newTagName.trim() || loading}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                 >
                   <Plus className="h-4 w-4" />
@@ -536,6 +535,7 @@ export default function SubmitPage() {
                     setVisibility('public')
                     setSelectedGroupId(null)
                   }}
+                  disabled={loading}
                   className="text-primary-600 focus:ring-primary-500"
                 />
                 <span className="text-sm text-gray-700">Public</span>
@@ -545,15 +545,15 @@ export default function SubmitPage() {
                   type="radio"
                   checked={visibility === 'restricted'}
                   onChange={() => setVisibility('restricted')}
+                  disabled={loading}
                   className="text-primary-600 focus:ring-primary-500"
                 />
                 <span className="text-sm text-gray-700">Restricted</span>
               </label>
             </div>
             
-            {/* Group selection for restricted */}
             {visibility === 'restricted' && (
-              <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg animate-fade-in">
                 <label className="flex items-center gap-2 text-sm font-medium text-amber-800 mb-2">
                   <Lock className="h-4 w-4" />
                   Select a group *
@@ -565,11 +565,12 @@ export default function SubmitPage() {
                         key={group.id}
                         type="button"
                         onClick={() => setSelectedGroupId(group.id)}
+                        disabled={loading}
                         className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                           selectedGroupId === group.id
                             ? 'bg-amber-600 text-white'
                             : 'bg-white border border-amber-300 text-amber-800 hover:border-amber-500'
-                        }`}
+                        } disabled:opacity-50`}
                       >
                         <FolderOpen className="h-4 w-4" />
                         {group.name}
@@ -593,9 +594,16 @@ export default function SubmitPage() {
           <button
             type="submit"
             disabled={loading || (visibility === 'restricted' && !selectedGroupId)}
-            className="w-full py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
-            {loading ? 'Submitting...' : 'Submit Bookmark'}
+            {loading ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              'Submit Bookmark'
+            )}
           </button>
         </form>
       </div>
