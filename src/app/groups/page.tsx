@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, FolderOpen, Users, Lock, Globe, Plus } from 'lucide-react'
+import { ArrowLeft, FolderOpen, Users, Lock, Globe, Check } from 'lucide-react'
 import { RequestJoinButton } from '@/components/groups/RequestJoinButton'
 import { RequestNewGroupButton } from '@/components/groups/RequestNewGroupButton'
+import { LeaveGroupButton } from '@/components/groups/LeaveGroupButton'
 
 export default async function GroupsPage() {
   const supabase = await createClient()
@@ -14,19 +15,22 @@ export default async function GroupsPage() {
     .from('groups')
     .select(`
       *,
-      group_members(user_id, role)
+      group_members(user_id, role, status)
     `)
     .eq('status', 'active')
     .order('name')
   
-  // Get user's group memberships
+  // Get user's group memberships (active only)
   let userMemberships: string[] = []
+  let pendingMemberships: string[] = []
   if (user) {
     const { data: memberships } = await supabase
       .from('group_members')
-      .select('group_id')
+      .select('group_id, status')
       .eq('user_id', user.id)
-    userMemberships = memberships?.map(m => m.group_id) || []
+    
+    userMemberships = memberships?.filter(m => m.status === 'active').map(m => m.group_id) || []
+    pendingMemberships = memberships?.filter(m => m.status === 'pending').map(m => m.group_id) || []
   }
 
   return (
@@ -57,14 +61,18 @@ export default async function GroupsPage() {
       {groups && groups.length > 0 ? (
         <div className="grid gap-4">
           {groups.map((group: any) => {
-            const memberCount = group.group_members?.length || 0
+            const activeMembers = group.group_members?.filter((m: any) => m.status === 'active') || []
+            const memberCount = activeMembers.length
             const isMember = userMemberships.includes(group.id)
+            const isPending = pendingMemberships.includes(group.id)
             const isPrivate = group.visibility === 'private'
             
             return (
               <div 
                 key={group.id} 
-                className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
+                className={`bg-white border rounded-lg p-4 hover:shadow-sm transition-shadow ${
+                  isMember ? 'border-green-200 bg-green-50/30' : 'border-gray-200'
+                }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -78,8 +86,14 @@ export default async function GroupsPage() {
                         <Globe className="h-4 w-4 text-green-500" />
                       )}
                       {isMember && (
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full flex items-center gap-1">
+                          <Check className="h-3 w-3" />
                           Member
+                        </span>
+                      )}
+                      {isPending && (
+                        <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
+                          Pending
                         </span>
                       )}
                     </div>
@@ -95,17 +109,22 @@ export default async function GroupsPage() {
                         <Users className="h-4 w-4" />
                         {memberCount} member{memberCount !== 1 ? 's' : ''}
                       </span>
-                      <span className="capitalize">{group.visibility}</span>
+                      <span className="capitalize">{group.visibility || 'private'}</span>
                     </div>
                   </div>
                   
                   <div className="shrink-0">
-                    {!isMember && user && (
-                      <RequestJoinButton groupId={group.id} groupName={group.name} />
-                    )}
-                    {!user && (
+                    {isMember ? (
+                      <LeaveGroupButton groupId={group.id} groupName={group.name} />
+                    ) : isPending ? (
+                      <span className="px-4 py-2 text-sm text-amber-600 bg-amber-50 rounded-lg">
+                        Request Pending
+                      </span>
+                    ) : user ? (
+                      <RequestJoinButton groupId={group.id} groupName={group.name} hasSecretCode={!!group.secret_code} />
+                    ) : (
                       <Link
-                        href={`/login?redirect=/groups`}
+                        href="/login?redirect=/groups"
                         className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                       >
                         Log in to join
