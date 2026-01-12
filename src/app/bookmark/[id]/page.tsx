@@ -11,9 +11,9 @@ import { BookmarkActions } from '@/components/bookmarks/BookmarkActions'
 export default async function BookmarkPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }) {
-  const { id } = await params
+  const { id } = params
   const supabase = await createClient()
 
   // Get current user (server-side)
