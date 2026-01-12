@@ -1,20 +1,20 @@
-# Bookmark Hub
+# BookmarkHub
 
-A collaborative bookmark sharing platform built with Next.js and Supabase.
+A collaborative bookmark sharing platform for the ServiceNow community.
 
 ## Features
 
-- 🔍 Search and discover bookmarks
-- 👥 Group-based access control
-- ⭐ Rating and favorites
+- 🔍 Search and discover curated ServiceNow bookmarks
+- 👥 Group-based access control with secret codes
+- ⭐ Rating and favorites system
 - 💬 Comments on bookmarks
 - 📊 Contributor leaderboard
-- 🔗 Broken link detection
+- 🏷️ Tag-based filtering
 - 📱 Mobile-responsive design
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14, React, Tailwind CSS
+- **Frontend**: Next.js 14, React 18, Tailwind CSS
 - **Backend**: Supabase (PostgreSQL, Auth, Storage)
 - **Deployment**: Vercel
 
