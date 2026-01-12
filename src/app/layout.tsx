@@ -16,6 +16,13 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: 'BookmarkHub - Discover & Share the Best Bookmarks',
   description: 'Find curated bookmarks from teams worldwide. Browse by popularity, explore categories, and save your favorites.',
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icon.svg', sizes: '32x32', type: 'image/svg+xml' },
+    ],
+    apple: '/apple-touch-icon.svg',
+  },
 }
 
 export default function RootLayout({

@@ -40,14 +40,9 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <a 
-                  href="https://www.linkedin.com/in/sylvainhauser/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-slate-300 hover:text-white transition-colors"
-                >
+                <Link href="/contact" className="text-slate-300 hover:text-white transition-colors">
                   Contact Us
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

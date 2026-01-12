@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 
 export default function HelpPage() {
@@ -43,7 +44,7 @@ export default function HelpPage() {
     },
     {
       question: 'How do I report inappropriate content?',
-      answer: 'If you find content that violates our community guidelines, please contact us through the Contact Us link in the footer. Include the bookmark URL and a brief description of the issue. Our team reviews all reports promptly.'
+      answer: 'If you find content that violates our community guidelines, please use our Contact Us page to report it. Include the bookmark URL and a brief description of the issue. Our team reviews all reports promptly.'
     }
   ]
 
@@ -93,14 +94,12 @@ export default function HelpPage() {
         <div className="mt-12 text-center bg-white rounded-xl p-8 shadow-sm border border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Still have questions?</h2>
           <p className="text-gray-600 mb-4">We&apos;re here to help!</p>
-          <a 
-            href="https://www.linkedin.com/in/sylvainhauser/" 
-            target="_blank" 
-            rel="noopener noreferrer"
+          <Link 
+            href="/contact"
             className="inline-block bg-gradient-to-r from-orange-500 to-amber-500 text-white px-6 py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-amber-600 transition-all"
           >
             Contact Us
-          </a>
+          </Link>
         </div>
       </div>
     </div>
