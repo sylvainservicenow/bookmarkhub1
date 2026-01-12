@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { createClient } from '@/lib/supabase/client'
+import { useLoadingMonitor } from '@/lib/monitoring'
 import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, ArrowLeft, Loader2, Save } from 'lucide-react'
 import Link from 'next/link'
 
@@ -32,6 +33,9 @@ export default function EditBookmarkPage() {
   const fetchedRef = useRef(false)
   const router = useRouter()
   const [supabase] = useState(() => createClient())
+
+  // Monitor for stuck loading states
+  useLoadingMonitor('EditBookmarkPage', authLoading || initialLoading)
 
   useEffect(() => {
     mountedRef.current = true
