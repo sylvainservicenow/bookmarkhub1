@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, ArrowLeft, Loader2, Save } from 'lucide-react'
@@ -12,8 +12,9 @@ interface TagType {
   name: string
 }
 
-export default function EditBookmarkPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id: bookmarkId } = React.use(params)
+export default function EditBookmarkPage() {
+  const params = useParams()
+  const bookmarkId = params.id as string
   const { user, loading: authLoading } = useAuth()
   
   const [url, setUrl] = useState('')
@@ -120,7 +121,7 @@ export default function EditBookmarkPage({ params }: { params: Promise<{ id: str
         <div className="text-center">
           <BookmarkIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
           <h1 className="text-xl font-bold text-gray-900 mb-2">Bookmark not found</h1>
-          <p className="text-gray-600 mb-4">This bookmark doesn't exist or you don't have permission.</p>
+          <p className="text-gray-600 mb-4">This bookmark doesn&apos;t exist or you don&apos;t have permission.</p>
           <Link href="/bookmarks" className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium">
             <ArrowLeft className="h-4 w-4" />Back to Bookmarks
           </Link>
