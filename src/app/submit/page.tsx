@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Plus, X, Check, Loader2, Sparkles, Globe, Lock } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Plus, X, Check, Loader2, Sparkles, Globe, Lock, Clock } from 'lucide-react'
 import { getFaviconUrl } from '@/lib/utils/favicon'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 
@@ -30,6 +30,7 @@ export default function SubmitPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [pendingTagsSubmitted, setPendingTagsSubmitted] = useState(false)
   const [fetchingTitle, setFetchingTitle] = useState(false)
   const [titleFetched, setTitleFetched] = useState(false)
   const [faviconUrl, setFaviconUrl] = useState<string | null>(null)
@@ -203,6 +204,7 @@ export default function SubmitPage() {
       return
     }
 
+    // Associate existing tags with the bookmark
     if (selectedTags.length > 0 && bookmark) {
       const tagInserts = selectedTags.map(tagId => ({
         bookmark_id: bookmark.id,
@@ -211,26 +213,17 @@ export default function SubmitPage() {
       await supabase.from('bookmark_tags').insert(tagInserts)
     }
 
+    // Create tag requests for custom tags (require admin approval)
     if (customTags.length > 0 && bookmark) {
       for (const tagName of customTags) {
-        const { data: newTag } = await supabase
-          .from('tags')
-          .insert({
-            name: tagName,
-            visibility: 'public',
-            status: 'active',
-            created_by: user.id,
-          })
-          .select()
-          .single()
-
-        if (newTag) {
-          await supabase.from('bookmark_tags').insert({
-            bookmark_id: bookmark.id,
-            tag_id: newTag.id,
-          })
-        }
+        await supabase.from('tag_requests').insert({
+          tag_name: tagName,
+          bookmark_id: bookmark.id,
+          requested_by: user.id,
+          status: 'pending',
+        })
       }
+      setPendingTagsSubmitted(true)
     }
 
     setSuccess(true)
@@ -268,7 +261,16 @@ export default function SubmitPage() {
             <BookmarkIcon className="h-8 w-8 text-green-600" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Bookmark Submitted!</h1>
-          <p className="text-gray-600 mb-6">Your bookmark has been added successfully.</p>
+          <p className="text-gray-600 mb-4">Your bookmark has been added successfully.</p>
+          {pendingTagsSubmitted && (
+            <div className="mb-6 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm">
+              <div className="flex items-center gap-2 justify-center">
+                <Clock className="h-4 w-4" />
+                <span>New tag requests are pending admin approval.</span>
+              </div>
+              <p className="text-xs mt-1">Tags will be added to your bookmark once approved.</p>
+            </div>
+          )}
           <div className="flex gap-3 justify-center">
             <button
               onClick={() => {
@@ -281,6 +283,7 @@ export default function SubmitPage() {
                 setIsPublic(true)
                 setTitleFetched(false)
                 setFaviconUrl(null)
+                setPendingTagsSubmitted(false)
               }}
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
             >
@@ -457,18 +460,21 @@ export default function SubmitPage() {
 
             {customTags.length > 0 && (
               <div className="mb-4">
-                <p className="text-xs text-gray-500 mb-2">New tags to create:</p>
+                <p className="text-xs text-amber-600 mb-2 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  New tags (pending admin approval):
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {customTags.map(tag => (
                     <span
                       key={tag}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-full text-sm"
                     >
                       {tag}
                       <button
                         type="button"
                         onClick={() => handleRemoveCustomTag(tag)}
-                        className="hover:text-green-900"
+                        className="hover:text-amber-900"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -479,7 +485,7 @@ export default function SubmitPage() {
             )}
 
             <div>
-              <p className="text-xs text-gray-500 mb-2">Or create a new tag:</p>
+              <p className="text-xs text-gray-500 mb-2">Or suggest a new tag:</p>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -494,12 +500,12 @@ export default function SubmitPage() {
                   type="button"
                   onClick={handleAddCustomTag}
                   disabled={!newTagName.trim() || loading}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-1">Press Enter or click + to add</p>
+              <p className="text-xs text-gray-400 mt-1">New tags require admin approval before being added</p>
             </div>
           </div>
 
