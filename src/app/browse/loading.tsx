@@ -30,10 +30,16 @@ export default function BrowseLoading() {
                 <div key={i} className="h-8 bg-gray-100 rounded-lg animate-pulse"></div>
               ))}
             </div>
+            <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3 mt-6">
+              <div className="h-5 w-28 bg-gray-200 rounded animate-pulse"></div>
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="h-8 bg-gray-100 rounded-lg animate-pulse"></div>
+              ))}
+            </div>
           </aside>
           
           {/* Main Content - Loading Animation */}
-          <main className="lg:col-span-6">
+          <main className="lg:col-span-9">
             <div className="flex flex-col items-center justify-center py-16">
               <Loader2 className="h-10 w-10 text-primary-500 animate-spin mb-4" />
               <p className="text-gray-600 font-medium">Loading bookmarks...</p>
@@ -42,7 +48,7 @@ export default function BrowseLoading() {
             
             {/* Skeleton Cards */}
             <div className="space-y-3 mt-4">
-              {[1, 2, 3].map((i) => (
+              {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="bg-white rounded-lg border border-gray-200 p-4">
                   <div className="flex gap-3">
                     <div className="w-10 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
@@ -56,16 +62,6 @@ export default function BrowseLoading() {
               ))}
             </div>
           </main>
-          
-          {/* Right Sidebar Skeleton */}
-          <aside className="lg:col-span-3">
-            <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
-              <div className="h-5 w-28 bg-gray-200 rounded animate-pulse"></div>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-6 bg-gray-100 rounded animate-pulse"></div>
-              ))}
-            </div>
-          </aside>
         </div>
       </div>
     </div>

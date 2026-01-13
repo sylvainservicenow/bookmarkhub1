@@ -4,7 +4,8 @@ import { authOptions } from '@/lib/auth/options'
 import { BrowseHeader } from '@/components/browse/BrowseHeader'
 import { FiltersSidebar } from '@/components/browse/FiltersSidebar'
 import { BookmarkList } from '@/components/browse/BookmarkList'
-import { ActivitySidebar } from '@/components/browse/ActivitySidebar'
+
+const ITEMS_PER_PAGE = 25
 
 export default async function BrowsePage({
   searchParams,
@@ -15,6 +16,7 @@ export default async function BrowsePage({
     tags?: string
     sort?: string
     rating?: string
+    page?: string
   }>
 }) {
   const params = await searchParams
@@ -23,6 +25,7 @@ export default async function BrowsePage({
   const tagsParam = params.tags || ''
   const sort = params.sort || 'recent'
   const minRating = params.rating ? parseInt(params.rating) : 0
+  const currentPage = params.page ? parseInt(params.page) : 1
   
   // Parse multiple tags
   const selectedTags = tagsParam ? tagsParam.split(',').filter(Boolean) : (tag ? [tag] : [])
@@ -80,7 +83,8 @@ export default async function BrowsePage({
     bookmarksQuery = bookmarksQuery.order('created_at', { ascending: false })
   }
   
-  const { data: bookmarks } = await bookmarksQuery.limit(50)
+  // Fetch more to allow for client-side filtering
+  const { data: bookmarks } = await bookmarksQuery.limit(500)
   
   let filteredBookmarks = bookmarks || []
   
@@ -118,74 +122,18 @@ export default async function BrowsePage({
     })
   }
   
-  // Get recent activity
-  const { data: recentActivityData } = await supabase
-    .from('bookmarks')
-    .select(`
-      id,
-      title,
-      created_at,
-      users!bookmarks_creator_id_fkey(id, name)
-    `)
-    .eq('status', 'active')
-    .eq('visibility', 'public')
-    .order('created_at', { ascending: false })
-    .limit(8)
-  
-  // Transform to handle array/object from Supabase
-  const recentActivity = (recentActivityData as any[] || []).map((item) => ({
-    id: item.id as string,
-    title: item.title as string,
-    created_at: item.created_at as string,
-    users: item.users
-  }))
-  
-  // Get top contributors
-  const { data: contributors } = await supabase
-    .from('bookmarks')
-    .select('creator_id, users!bookmarks_creator_id_fkey(id, name)')
-    .eq('status', 'active')
-    .eq('visibility', 'public')
-  
-  // Count bookmarks per user
-  const contributorCounts: Record<string, { id: string; name: string; count: number }> = {}
-  contributors?.forEach((b: any) => {
-    const userObj = Array.isArray(b.users) ? b.users[0] : b.users
-    if (userObj?.id) {
-      if (!contributorCounts[userObj.id]) {
-        contributorCounts[userObj.id] = { id: userObj.id, name: userObj.name || 'Anonymous', count: 0 }
-      }
-      contributorCounts[userObj.id].count++
-    }
-  })
-  
-  const topContributors = Object.values(contributorCounts)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5)
-  
-  // Get popular tags
-  const { data: tagCounts } = await supabase
-    .from('bookmark_tags')
-    .select('tags(name)')
-  
-  const tagCountMap: Record<string, number> = {}
-  tagCounts?.forEach((t: any) => {
-    if (t.tags?.name) {
-      tagCountMap[t.tags.name] = (tagCountMap[t.tags.name] || 0) + 1
-    }
-  })
-  
-  const popularTags = Object.entries(tagCountMap)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 8)
-    .map(([name]) => name)
+  // Pagination
+  const totalCount = filteredBookmarks.length
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const paginatedBookmarks = filteredBookmarks.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header with search */}
       <BrowseHeader initialQuery={query} />
       
-      {/* Main 3-column layout */}
+      {/* Main 2-column layout */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Sidebar - Filters */}
@@ -195,30 +143,25 @@ export default async function BrowsePage({
               selectedTags={selectedTags}
               minRating={minRating}
               searchParams={params}
-              topContributors={topContributors}
+              allTags={allTags || []}
             />
           </aside>
           
           {/* Main Content - Bookmark List */}
-          <main className="lg:col-span-6">
+          <main className="lg:col-span-9">
             <BookmarkList
-              bookmarks={filteredBookmarks}
+              bookmarks={paginatedBookmarks}
               userFavorites={userFavorites}
-              totalCount={filteredBookmarks.length}
+              totalCount={totalCount}
               query={query}
               selectedTags={selectedTags}
               minRating={minRating}
               sort={sort}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              searchParams={params}
             />
           </main>
-          
-          {/* Right Sidebar - Activity */}
-          <aside className="lg:col-span-3">
-            <ActivitySidebar
-              recentActivity={recentActivity}
-              popularTags={popularTags}
-            />
-          </aside>
         </div>
       </div>
     </div>

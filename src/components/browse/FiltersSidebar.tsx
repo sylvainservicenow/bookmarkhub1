@@ -1,14 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { Clock, TrendingUp, Star, MessageSquare, User } from 'lucide-react'
+import { Clock, TrendingUp, Star, MessageSquare, Tag, Check } from 'lucide-react'
 
 interface FiltersSidebarProps {
   currentSort: string
   selectedTags: string[]
   minRating: number
   searchParams: { [key: string]: string | undefined }
-  topContributors: { id: string; name: string; count: number }[]
+  allTags: { id: string; name: string }[]
 }
 
 export function FiltersSidebar({ 
@@ -16,7 +16,7 @@ export function FiltersSidebar({
   selectedTags, 
   minRating,
   searchParams,
-  topContributors 
+  allTags
 }: FiltersSidebarProps) {
   const sortOptions = [
     { id: 'recent', label: 'Most Recent', icon: Clock },
@@ -28,11 +28,32 @@ export function FiltersSidebar({
   const buildUrl = (newParams: Record<string, string | undefined>) => {
     const params = new URLSearchParams()
     const merged = { ...searchParams, ...newParams }
+    // Reset page when changing filters
+    delete merged.page
     Object.entries(merged).forEach(([key, value]) => {
       if (value) params.set(key, value)
     })
     return `/browse?${params.toString()}`
   }
+
+  const toggleTag = (tagName: string) => {
+    const currentTags = [...selectedTags]
+    const index = currentTags.findIndex(t => t.toLowerCase() === tagName.toLowerCase())
+    
+    if (index >= 0) {
+      currentTags.splice(index, 1)
+    } else {
+      currentTags.push(tagName)
+    }
+    
+    return buildUrl({ 
+      tags: currentTags.length > 0 ? currentTags.join(',') : undefined,
+      tag: undefined // Clear single tag param
+    })
+  }
+
+  const isTagSelected = (tagName: string) => 
+    selectedTags.some(t => t.toLowerCase() === tagName.toLowerCase())
 
   return (
     <div className="space-y-6">
@@ -88,25 +109,46 @@ export function FiltersSidebar({
         </div>
       </div>
 
-      {/* Top Contributors */}
-      {topContributors.length > 0 && (
+      {/* Tags Filter */}
+      {allTags.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <h3 className="font-semibold text-gray-900 mb-3">Top Contributors</h3>
-          <div className="space-y-2">
-            {topContributors.map((contributor, index) => (
-              <div
-                key={contributor.id}
-                className="flex items-center gap-2 text-sm"
-              >
-                <span className="w-5 h-5 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-medium">
-                  {index + 1}
-                </span>
-                <User className="h-3 w-3 text-gray-400" />
-                <span className="text-gray-700 truncate flex-1">{contributor.name}</span>
-                <span className="text-gray-400 text-xs">{contributor.count}</span>
-              </div>
-            ))}
+          <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Tag className="h-4 w-4" />
+            Filter by Tags
+          </h3>
+          <div className="max-h-64 overflow-y-auto space-y-1">
+            {allTags.map((tag) => {
+              const isSelected = isTagSelected(tag.name)
+              return (
+                <Link
+                  key={tag.id}
+                  href={toggleTag(tag.name)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    isSelected
+                      ? 'bg-teal-50 text-teal-700 font-medium'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                    isSelected 
+                      ? 'bg-teal-500 border-teal-500' 
+                      : 'border-gray-300'
+                  }`}>
+                    {isSelected && <Check className="h-3 w-3 text-white" />}
+                  </div>
+                  <span className="truncate">{tag.name}</span>
+                </Link>
+              )
+            })}
           </div>
+          {selectedTags.length > 0 && (
+            <Link
+              href={buildUrl({ tags: undefined, tag: undefined })}
+              className="block mt-3 text-xs text-center text-primary-600 hover:text-primary-700"
+            >
+              Clear tag filters
+            </Link>
+          )}
         </div>
       )}
     </div>
