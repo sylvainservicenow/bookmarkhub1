@@ -1,46 +1,98 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
-import { ArrowLeft, Tag, Plus, Settings, Clock } from 'lucide-react'
+import { ArrowLeft, Tag, Plus, Settings, Clock, Loader2 } from 'lucide-react'
 import { TagStatusSelect } from '@/components/admin/TagStatusSelect'
 import { CreateTagForm } from '@/components/admin/CreateTagForm'
 import { TagRequestsManager } from '@/components/admin/TagRequestsManager'
 
-export default async function AdminTagsPage() {
-  const supabase = await createClient()
+interface TagWithRelations {
+  id: string
+  name: string
+  visibility: string
+  status: string
+  bookmark_tags: { count: number }[]
+  tag_groups: { group_id: string; groups: { name: string } | null }[]
+}
+
+export default function AdminTagsPage() {
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
   
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    redirect('/login?redirect=/admin/tags')
+  const [profile, setProfile] = useState<{ role: string } | null>(null)
+  const [tags, setTags] = useState<TagWithRelations[]>([])
+  const [pendingCount, setPendingCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [supabase] = useState(() => createClient())
+  const router = useRouter()
+
+  useEffect(() => {
+    if (authLoading) return
+    
+    if (!user?.id) {
+      router.push('/login?redirect=/admin/tags')
+      return
+    }
+
+    const fetchData = async () => {
+      // Fetch profile to check role
+      const { data: profileData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      
+      setProfile(profileData)
+      
+      if (profileData?.role !== 'admin') {
+        router.push('/dashboard')
+        return
+      }
+
+      // Get all tags with usage count and group associations
+      const { data: tagsData } = await supabase
+        .from('tags')
+        .select(`
+          *,
+          bookmark_tags (count),
+          tag_groups (group_id, groups(name))
+        `)
+        .order('name', { ascending: true })
+
+      if (tagsData) setTags(tagsData)
+
+      // Get pending tag requests count
+      const { count } = await supabase
+        .from('tag_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending')
+
+      setPendingCount(count || 0)
+      setLoading(false)
+    }
+
+    fetchData()
+  }, [user?.id, authLoading, router, supabase])
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading...</span>
+        </div>
+      </div>
+    )
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    redirect('/dashboard')
+  if (!user || profile?.role !== 'admin') {
+    return null
   }
-
-  // Get all tags with usage count and group associations
-  const { data: tags } = await supabase
-    .from('tags')
-    .select(`
-      *,
-      bookmark_tags (count),
-      tag_groups (group_id, groups(name))
-    `)
-    .order('name', { ascending: true })
-
-  // Get pending tag requests count
-  const { count: pendingCount } = await supabase
-    .from('tag_requests')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'pending')
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -61,7 +113,7 @@ export default async function AdminTagsPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Manage Tags</h1>
-              <p className="text-gray-600">{tags?.length || 0} tags</p>
+              <p className="text-gray-600">{tags.length || 0} tags</p>
             </div>
           </div>
         </div>
@@ -72,7 +124,7 @@ export default async function AdminTagsPage() {
         <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
           <Clock className="h-5 w-5 text-amber-600" />
           Pending Tag Requests
-          {(pendingCount ?? 0) > 0 && (
+          {pendingCount > 0 && (
             <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-sm rounded-full">
               {pendingCount}
             </span>
@@ -107,8 +159,8 @@ export default async function AdminTagsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {tags?.map((tag: any) => {
-              const groups = tag.tag_groups?.map((tg: any) => tg.groups?.name).filter(Boolean) || []
+            {tags.map((tag) => {
+              const groups = tag.tag_groups?.map((tg) => tg.groups?.name).filter(Boolean) || []
               return (
                 <tr key={tag.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
@@ -130,7 +182,7 @@ export default async function AdminTagsPage() {
                     {tag.visibility === 'restricted' ? (
                       groups.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
-                          {groups.map((name: string, i: number) => (
+                          {groups.map((name, i) => (
                             <span key={i} className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">
                               {name}
                             </span>
