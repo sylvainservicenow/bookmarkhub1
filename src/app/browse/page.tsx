@@ -18,6 +18,7 @@ export default async function BrowsePage({
     rating?: string
     page?: string
     favorites?: string
+    private?: string
   }>
 }) {
   const params = await searchParams
@@ -28,6 +29,7 @@ export default async function BrowsePage({
   const minRating = params.rating ? parseInt(params.rating) : 0
   const currentPage = params.page ? parseInt(params.page) : 1
   const showFavoritesOnly = params.favorites === 'true'
+  const showPrivateOnly = params.private === 'true'
   
   // Parse multiple tags
   const selectedTags = tagsParam ? tagsParam.split(',').filter(Boolean) : (tag ? [tag] : [])
@@ -44,6 +46,18 @@ export default async function BrowsePage({
       .select('bookmark_id')
       .eq('user_id', user.id)
     userFavorites = favorites?.map(f => f.bookmark_id) || []
+  }
+  
+  // Get user's private bookmarks count
+  let privateBookmarksCount = 0
+  if (user?.id) {
+    const { count } = await supabase
+      .from('bookmarks')
+      .select('*', { count: 'exact', head: true })
+      .eq('creator_id', user.id)
+      .eq('visibility', 'private')
+      .eq('status', 'active')
+    privateBookmarksCount = count || 0
   }
   
   // Get all tags for filter
@@ -64,8 +78,14 @@ export default async function BrowsePage({
     `)
     .eq('status', 'active')
   
-  // Visibility filter: public OR own bookmarks
-  if (user?.id) {
+  // Visibility filter: depends on whether showing private only
+  if (showPrivateOnly && user?.id) {
+    // Show only user's private bookmarks
+    bookmarksQuery = bookmarksQuery
+      .eq('creator_id', user.id)
+      .eq('visibility', 'private')
+  } else if (user?.id) {
+    // Normal mode: public OR own bookmarks
     bookmarksQuery = bookmarksQuery.or(`visibility.eq.public,creator_id.eq.${user.id}`)
   } else {
     bookmarksQuery = bookmarksQuery.eq('visibility', 'public')
@@ -156,6 +176,8 @@ export default async function BrowsePage({
               isLoggedIn={!!user}
               showFavoritesOnly={showFavoritesOnly}
               favoritesCount={userFavorites.length}
+              showPrivateOnly={showPrivateOnly}
+              privateCount={privateBookmarksCount}
             />
           </aside>
           
