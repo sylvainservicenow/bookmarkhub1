@@ -1,8 +1,17 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth/options'
 import { BrowseHeader } from '@/components/browse/BrowseHeader'
 import { FiltersSidebar } from '@/components/browse/FiltersSidebar'
 import { BookmarkList } from '@/components/browse/BookmarkList'
 import { ActivitySidebar } from '@/components/browse/ActivitySidebar'
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
 export default async function BrowsePage({
   searchParams,
@@ -27,14 +36,13 @@ export default async function BrowsePage({
   // Parse multiple tags
   const selectedTags = tagsParam ? tagsParam.split(',').filter(Boolean) : (tag ? [tag] : [])
   
-  const supabase = await createClient()
-  
-  // Get current user for favorites
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = getSupabase()
+  const session = await getServerSession(authOptions)
+  const user = session?.user
   
   // Get user's favorites
   let userFavorites: string[] = []
-  if (user) {
+  if (user?.id) {
     const { data: favorites } = await supabase
       .from('favorites')
       .select('bookmark_id')
@@ -120,7 +128,7 @@ export default async function BrowsePage({
     })
   }
   
-  // Get recent activity - use any type to handle Supabase nested relations
+  // Get recent activity
   const { data: recentActivityData } = await supabase
     .from('bookmarks')
     .select(`
@@ -149,7 +157,7 @@ export default async function BrowsePage({
     .eq('status', 'active')
     .eq('visibility', 'public')
   
-  // Count bookmarks per user - handle array/object from Supabase
+  // Count bookmarks per user
   const contributorCounts: Record<string, { id: string; name: string; count: number }> = {}
   contributors?.forEach((b: any) => {
     const userObj = Array.isArray(b.users) ? b.users[0] : b.users
