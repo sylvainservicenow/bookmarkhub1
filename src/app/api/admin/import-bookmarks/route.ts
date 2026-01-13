@@ -1,16 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth/options'
+import { createClient } from '@supabase/supabase-js'
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  )
+}
 
 // POST /api/admin/import-bookmarks
 // Imports bookmarks from JSON data
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const session = await getServerSession(authOptions)
     
-    // Check if user is authenticated
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Verify admin role
+    const supabase = getSupabaseAdmin()
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
+    
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
     const { bookmarks } = await request.json()
@@ -64,7 +89,7 @@ export async function POST(request: NextRequest) {
             description: bookmark.description || bookmark.title.substring(0, 200),
             visibility: bookmark.groupName ? 'restricted' : 'public',
             status: 'active',
-            creator_id: user.id,
+            creator_id: session.user.id,
             favicon_url: faviconUrl
           })
           .select('id')
