@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useAuth } from '@/contexts/AuthContext'
+import { useSession, signOut } from 'next-auth/react'
 import { BookmarkIcon, User as UserIcon, Plus, Loader2, LogOut } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 
 // Avatar mapping - must match settings page
 const AVATAR_MAP: Record<string, string> = {
@@ -15,11 +16,60 @@ const AVATAR_MAP: Record<string, string> = {
 }
 
 export function Header() {
-  const { user, profile, loading, signOut } = useAuth()
+  const { data: session, status } = useSession()
   const [showDropdown, setShowDropdown] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [signingOut, setSigningOut] = useState(false)
+  const loading = status === 'loading'
+  const user = session?.user
 
-  const displayName = profile?.name || user?.email?.split('@')[0] || ''
-  const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
+  // Fetch avatar from profile
+  useEffect(() => {
+    if (user?.id) {
+      const fetchAvatar = async () => {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('users')
+          .select('avatar_url')
+          .eq('id', user.id)
+          .single()
+        if (data?.avatar_url) {
+          setAvatarUrl(data.avatar_url)
+        }
+      }
+      fetchAvatar()
+    }
+  }, [user?.id])
+
+  const displayName = user?.name || user?.email?.split('@')[0] || ''
+  const avatarEmoji = avatarUrl ? AVATAR_MAP[avatarUrl] : null
+
+  const handleSignOut = async () => {
+    setShowDropdown(false)
+    setSigningOut(true)
+    try {
+      // First call our custom signout endpoint to clear cookies
+      await fetch('/api/auth/signout', { method: 'POST' })
+      // Then call NextAuth signOut
+      await signOut({ redirect: false })
+      // Clear any client-side storage
+      if (typeof window !== 'undefined') {
+        sessionStorage.clear()
+        // Delete cookies manually on client side too
+        document.cookie.split(';').forEach(cookie => {
+          const name = cookie.split('=')[0].trim()
+          if (name.includes('next-auth') || name.includes('session')) {
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+          }
+        })
+      }
+      // Force a hard navigation to clear all state
+      window.location.href = '/'
+    } catch (error) {
+      console.error('Sign out error:', error)
+      window.location.href = '/'
+    }
+  }
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -33,10 +83,10 @@ export function Header() {
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            {loading ? (
+            {loading || signingOut ? (
               <div className="flex items-center gap-2 text-gray-400">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                <span className="text-sm hidden sm:inline">Loading...</span>
+                <span className="text-sm hidden sm:inline">{signingOut ? 'Signing out...' : 'Loading...'}</span>
               </div>
             ) : user ? (
               <>
@@ -104,10 +154,7 @@ export function Header() {
                         </Link>
                         <hr className="my-1 border-gray-200" />
                         <button
-                          onClick={() => {
-                            setShowDropdown(false)
-                            signOut()
-                          }}
+                          onClick={handleSignOut}
                           className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
                         >
                           <LogOut className="h-4 w-4" />

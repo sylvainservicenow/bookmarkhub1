@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
 import { ArrowLeft, User, Mail, Calendar, Shield, Save, Check, Loader2 } from 'lucide-react'
 
@@ -35,25 +35,51 @@ const AVATAR_OPTIONS = [
   { id: 'robot', emoji: '🤖', label: 'Robot' },
 ]
 
+interface Profile {
+  name: string | null
+  avatar_url: string | null
+  role: string
+  created_at: string | null
+}
+
 export default function SettingsPage() {
-  const { user, profile, loading: authLoading, refreshProfile } = useAuth()
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
+  
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [name, setName] = useState('')
   const [selectedAvatar, setSelectedAvatar] = useState('')
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const [supabase] = useState(() => createClient())
 
   useEffect(() => {
-    if (profile) {
-      setName(profile.name || '')
-      setSelectedAvatar(profile.avatar_url || '')
+    if (!user?.id) return
+    
+    const fetchProfile = async () => {
+      const { data } = await supabase
+        .from('users')
+        .select('name, avatar_url, role, created_at')
+        .eq('id', user.id)
+        .single()
+      
+      if (data) {
+        setProfile(data)
+        setName(data.name || '')
+        setSelectedAvatar(data.avatar_url || '')
+      }
+      setLoading(false)
     }
-  }, [profile])
+    
+    fetchProfile()
+  }, [user?.id, supabase])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user) return
+    if (!user?.id) return
     
     setError(null)
     setSaving(true)
@@ -72,7 +98,7 @@ export default function SettingsPage() {
       setError(updateError.message)
     } else {
       setSuccess(true)
-      await refreshProfile()
+      setProfile(prev => prev ? { ...prev, name, avatar_url: selectedAvatar } : null)
       setTimeout(() => setSuccess(false), 3000)
     }
 
@@ -81,7 +107,7 @@ export default function SettingsPage() {
 
   const currentAvatar = AVATAR_OPTIONS.find(a => a.id === selectedAvatar)
 
-  if (authLoading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
         <div className="flex items-center gap-2 text-gray-500">
@@ -224,13 +250,13 @@ export default function SettingsPage() {
           <div className="flex items-center gap-3 text-gray-600">
             <Shield className="h-4 w-4" />
             <span className="font-medium">Role:</span>
-            <span className="capitalize">{profile?.role || 'user'}</span>
+            <span className="capitalize">{profile?.role || user.role || 'user'}</span>
           </div>
           
           <div className="flex items-center gap-3 text-gray-600">
             <Calendar className="h-4 w-4" />
             <span className="font-medium">Member since:</span>
-            <span>{new Date(profile?.created_at || user.created_at || Date.now()).toLocaleDateString()}</span>
+            <span>{new Date(profile?.created_at || Date.now()).toLocaleDateString()}</span>
           </div>
         </div>
 

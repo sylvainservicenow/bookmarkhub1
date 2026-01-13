@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
 import { ArrowLeft, Users, Bookmark, Tag, Shield, Clock, FolderOpen, CheckSquare, Upload, Loader2, AlertTriangle } from 'lucide-react'
 
 export default function AdminPage() {
-  const { user, profile, loading: authLoading } = useAuth()
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
+  
+  const [profile, setProfile] = useState<{ role: string } | null>(null)
   const [stats, setStats] = useState({
     userCount: 0,
     bookmarkCount: 0,
@@ -25,12 +29,26 @@ export default function AdminPage() {
   useEffect(() => {
     if (authLoading) return
     
-    if (!user || profile?.role !== 'admin') {
+    if (!user?.id) {
       router.push('/dashboard')
       return
     }
 
-    const fetchStats = async () => {
+    const fetchData = async () => {
+      // Fetch profile to check role
+      const { data: profileData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      
+      setProfile(profileData)
+      
+      if (profileData?.role !== 'admin') {
+        router.push('/dashboard')
+        return
+      }
+
       const [
         { count: userCount },
         { count: bookmarkCount },
@@ -63,8 +81,8 @@ export default function AdminPage() {
       setLoading(false)
     }
 
-    fetchStats()
-  }, [user, profile, authLoading, router, supabase])
+    fetchData()
+  }, [user?.id, authLoading, router, supabase])
 
   if (authLoading || loading) {
     return (
