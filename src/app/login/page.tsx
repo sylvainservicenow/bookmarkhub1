@@ -3,8 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
-import { useAuth } from '@/contexts/AuthContext'
+import { signIn, useSession } from 'next-auth/react'
 import { BookmarkIcon, Mail, Loader2, CheckCircle, LogIn } from 'lucide-react'
 
 function LoginForm() {
@@ -13,78 +12,53 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [showResendOption, setShowResendOption] = useState(false)
-  const [resendLoading, setResendLoading] = useState(false)
-  const [resendSuccess, setResendSuccess] = useState(false)
   
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, loading: authLoading } = useAuth()
-  const redirect = searchParams.get('redirect') || '/dashboard'
-  const supabase = createClient()
+  const { data: session, status } = useSession()
+  const redirect = searchParams.get('redirect') || searchParams.get('callbackUrl') || '/dashboard'
 
   // If already logged in, redirect
   useEffect(() => {
-    if (!authLoading && user) {
+    if (status === 'authenticated' && session) {
       router.push(redirect)
     }
-  }, [user, authLoading, router, redirect])
+  }, [session, status, router, redirect])
+
+  // Check for error from NextAuth
+  useEffect(() => {
+    const errorParam = searchParams.get('error')
+    if (errorParam) {
+      if (errorParam === 'CredentialsSignin') {
+        setError('Invalid email or password')
+      } else {
+        setError(errorParam)
+      }
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    setShowResendOption(false)
-    setResendSuccess(false)
     setLoading(true)
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const result = await signIn('credentials', {
         email,
         password,
+        redirect: false,
       })
 
-      if (signInError) {
-        setError(signInError.message)
-        if (signInError.message.toLowerCase().includes('email not confirmed')) {
-          setShowResendOption(true)
-        }
+      if (result?.error) {
+        setError(result.error)
         setLoading(false)
         return
-      }
-
-      // Check if user account is active
-      if (data.user) {
-        try {
-          const { data: profile } = await supabase
-            .from('users')
-            .select('status')
-            .eq('id', data.user.id)
-            .single()
-
-          if (profile?.status === 'suspended') {
-            await supabase.auth.signOut()
-            setError('Your account has been suspended. Please contact an administrator.')
-            setLoading(false)
-            return
-          }
-
-          if (profile?.status === 'archived') {
-            await supabase.auth.signOut()
-            setError('Your account has been archived. Please contact an administrator to restore it.')
-            setLoading(false)
-            return
-          }
-        } catch (profileError) {
-          // If profile check fails, still allow login
-          console.error('Profile check failed:', profileError)
-        }
       }
 
       // Show success state before redirect
       setSuccess(true)
       
-      // The AuthContext will handle the state update
-      // Just redirect after a brief success display
+      // Redirect after brief success display
       setTimeout(() => {
         router.push(redirect)
         router.refresh()
@@ -96,36 +70,8 @@ function LoginForm() {
     }
   }
 
-  const handleResendConfirmation = async () => {
-    if (!email) {
-      setError('Please enter your email address first')
-      return
-    }
-
-    setResendLoading(true)
-    setError(null)
-
-    try {
-      const { error: resendError } = await supabase.auth.resend({
-        type: 'signup',
-        email,
-      })
-
-      if (resendError) {
-        setError(resendError.message)
-      } else {
-        setResendSuccess(true)
-        setShowResendOption(false)
-      }
-    } catch (err) {
-      setError('Failed to resend confirmation email')
-    }
-
-    setResendLoading(false)
-  }
-
   // Show loading while checking auth
-  if (authLoading) {
+  if (status === 'loading') {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
@@ -134,7 +80,7 @@ function LoginForm() {
   }
 
   // Don't show form if already logged in (will redirect)
-  if (user) {
+  if (status === 'authenticated') {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
@@ -148,30 +94,6 @@ function LoginForm() {
       {error && (
         <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm animate-fade-in">
           {error}
-        </div>
-      )}
-
-      {resendSuccess && (
-        <div className="bg-green-50 text-green-600 px-4 py-3 rounded-lg text-sm flex items-center gap-2 animate-fade-in">
-          <Mail className="h-4 w-4" />
-          Confirmation email sent! Please check your inbox.
-        </div>
-      )}
-
-      {showResendOption && (
-        <div className="bg-amber-50 border border-amber-200 px-4 py-3 rounded-lg animate-fade-in">
-          <p className="text-amber-800 text-sm mb-2">
-            Your email hasn't been confirmed yet.
-          </p>
-          <button
-            type="button"
-            onClick={handleResendConfirmation}
-            disabled={resendLoading}
-            className="text-sm font-medium text-amber-700 hover:text-amber-800 underline disabled:opacity-50 inline-flex items-center gap-1"
-          >
-            {resendLoading && <Loader2 className="h-3 w-3 animate-spin" />}
-            {resendLoading ? 'Sending...' : 'Resend confirmation email'}
-          </button>
         </div>
       )}
 
