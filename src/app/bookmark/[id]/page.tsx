@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, User, Globe, Archive } from 'lucide-react'
+import { ArrowLeft, Calendar, User, Globe, Archive, Lock } from 'lucide-react'
 import { RatingStars } from '@/components/bookmarks/RatingStars'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 import { CommentSection } from '@/components/comments/CommentSection'
@@ -55,6 +55,7 @@ export default async function BookmarkPage({
   } catch {}
 
   const isArchived = bookmark.status === 'archived'
+  const isPrivate = bookmark.visibility === 'private'
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -166,13 +167,17 @@ export default async function BookmarkPage({
 
         {/* Status badges */}
         <div className="mt-4 flex gap-2">
-          <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
-            bookmark.visibility === 'public' 
-              ? 'bg-green-100 text-green-700' 
-              : 'bg-yellow-100 text-yellow-700'
-          }`}>
-            {bookmark.visibility}
-          </span>
+          {isPrivate ? (
+            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
+              <Lock className="h-3 w-3" />
+              Private
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
+              <Globe className="h-3 w-3" />
+              Public
+            </span>
+          )}
           {isArchived && (
             <span className="inline-flex px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
               archived
