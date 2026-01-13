@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Lock, ArrowLeft, Loader2, Save } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Lock, ArrowLeft, Loader2, Save, Archive, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 
 interface TagType {
@@ -25,8 +25,10 @@ export default function EditBookmarkPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [availableTags, setAvailableTags] = useState<TagType[]>([])
   const [isPublic, setIsPublic] = useState(true)
+  const [isArchived, setIsArchived] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [archiving, setArchiving] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [permissionDenied, setPermissionDenied] = useState(false)
@@ -99,6 +101,7 @@ export default function EditBookmarkPage() {
         setTitle(bookmark.title)
         setDescription(bookmark.description || '')
         setIsPublic(bookmark.visibility === 'public')
+        setIsArchived(bookmark.status === 'archived')
         setSelectedTags(bookmark.bookmark_tags?.map((bt: any) => bt.tag_id) || [])
 
         const { data: tags } = await supabase
@@ -148,6 +151,31 @@ export default function EditBookmarkPage() {
       await supabase.from('bookmark_tags').insert(selectedTags.map(tagId => ({ bookmark_id: bookmarkId, tag_id: tagId })))
     }
     
+    router.push(`/bookmark/${bookmarkId}`)
+  }
+
+  const handleArchiveToggle = async () => {
+    if (!user) return
+    setArchiving(true)
+    setError(null)
+
+    const newStatus = isArchived ? 'active' : 'archived'
+    
+    const { error: updateError } = await supabase
+      .from('bookmarks')
+      .update({ status: newStatus })
+      .eq('id', bookmarkId)
+
+    if (updateError) {
+      setError(updateError.message)
+      setArchiving(false)
+      return
+    }
+
+    setIsArchived(!isArchived)
+    setArchiving(false)
+    
+    // Redirect to bookmark page after archiving/unarchiving
     router.push(`/bookmark/${bookmarkId}`)
   }
 
@@ -218,6 +246,14 @@ export default function EditBookmarkPage() {
           <h1 className="text-2xl font-bold text-gray-900">Edit Bookmark</h1>
         </div>
 
+        {/* Archived banner */}
+        {isArchived && (
+          <div className="mb-6 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-amber-700">
+            <Archive className="h-5 w-5" />
+            <span>This bookmark is archived. Restore it to make it visible again.</span>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
           {error && <div className="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">{error}</div>}
 
@@ -274,13 +310,43 @@ export default function EditBookmarkPage() {
           </div>
 
           <div className="flex gap-3">
-            <button type="submit" disabled={loading}
+            <button type="submit" disabled={loading || archiving}
               className="flex-1 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-70 transition-all flex items-center justify-center gap-2">
               {loading ? <><Loader2 className="h-5 w-5 animate-spin" />Saving...</> : <><Save className="h-5 w-5" />Save Changes</>}
             </button>
             <Link href={`/bookmark/${bookmarkId}`} className="px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors">Cancel</Link>
           </div>
         </form>
+
+        {/* Archive Section */}
+        <div className="mt-6 bg-white border border-gray-200 rounded-lg p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">
+            {isArchived ? 'Restore Bookmark' : 'Archive Bookmark'}
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            {isArchived 
+              ? 'Restoring this bookmark will make it visible again in browse and search results.'
+              : 'Archiving this bookmark will hide it from browse and search results. You can restore it later.'}
+          </p>
+          <button
+            type="button"
+            onClick={handleArchiveToggle}
+            disabled={loading || archiving}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-70 ${
+              isArchived 
+                ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+            }`}
+          >
+            {archiving ? (
+              <><Loader2 className="h-4 w-4 animate-spin" />{isArchived ? 'Restoring...' : 'Archiving...'}</>
+            ) : isArchived ? (
+              <><RotateCcw className="h-4 w-4" />Restore Bookmark</>
+            ) : (
+              <><Archive className="h-4 w-4" />Archive Bookmark</>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )
