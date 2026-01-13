@@ -1,15 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-}
-
 export async function CategoryPills() {
-  const supabase = getSupabase()
+  const supabase = createAdminClient()
   
   // Fetch top tags with bookmark counts
   const { data: tags } = await supabase

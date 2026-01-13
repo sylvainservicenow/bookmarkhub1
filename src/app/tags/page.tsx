@@ -1,16 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import { ArrowLeft, Tag } from 'lucide-react'
 
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-}
-
 export default async function TagsPage() {
-  const supabase = getSupabase()
+  const supabase = createAdminClient()
   
   // Get all active tags with usage count
   const { data: tags } = await supabase

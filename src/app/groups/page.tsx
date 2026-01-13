@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/options'
 import Link from 'next/link'
@@ -7,15 +7,8 @@ import { RequestJoinButton } from '@/components/groups/RequestJoinButton'
 import { RequestNewGroupButton } from '@/components/groups/RequestNewGroupButton'
 import { LeaveGroupButton } from '@/components/groups/LeaveGroupButton'
 
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-}
-
 export default async function GroupsPage() {
-  const supabase = getSupabase()
+  const supabase = createAdminClient()
   const session = await getServerSession(authOptions)
   const user = session?.user
   

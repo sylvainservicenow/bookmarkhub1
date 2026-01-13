@@ -1,17 +1,10 @@
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import { Star } from 'lucide-react'
 import { TopRatedBookmarkCard } from './TopRatedBookmarkCard'
 
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-}
-
 export async function TopRatedSection() {
-  const supabase = getSupabase()
+  const supabase = createAdminClient()
   
   // Fetch all ratings with bookmark info
   const { data: allRatings } = await supabase

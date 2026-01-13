@@ -1,17 +1,10 @@
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { Bookmark, Users, TrendingUp } from 'lucide-react'
 
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-}
-
 export async function HeroStats() {
-  const supabase = getSupabase()
+  const supabase = createAdminClient()
   
-  // Fetch counts - don't filter by visibility for total count
+  // Fetch counts using admin client (bypasses RLS)
   const [bookmarksResult, usersResult] = await Promise.all([
     supabase
       .from('bookmarks')
