@@ -5,6 +5,9 @@ import { BrowseHeader } from '@/components/browse/BrowseHeader'
 import { FiltersSidebar } from '@/components/browse/FiltersSidebar'
 import { BookmarkList } from '@/components/browse/BookmarkList'
 
+// Force dynamic rendering to ensure fresh data
+export const dynamic = 'force-dynamic'
+
 const ITEMS_PER_PAGE = 25
 
 export default async function BrowsePage({
