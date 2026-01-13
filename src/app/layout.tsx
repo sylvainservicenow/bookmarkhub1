@@ -6,6 +6,7 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { NavigationProgress } from '@/components/layout/NavigationProgress'
 import { SessionProvider } from '@/components/providers/SessionProvider'
+import { FloatingFeedback } from '@/components/feedback/FloatingFeedback'
 
 const dmSans = DM_Sans({ 
   subsets: ['latin'],
@@ -40,6 +41,7 @@ export default function RootLayout({
           <Header />
           <main className="animate-fade-in">{children}</main>
           <Footer />
+          <FloatingFeedback />
         </SessionProvider>
       </body>
     </html>

@@ -101,6 +101,26 @@ textarea:focus-visible {
   animation: heartPop 0.3s ease-out;
 }
 
+/* Success bounce animation for feedback submission */
+@keyframes bounceOnce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(0.95);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  75% {
+    transform: scale(0.98);
+  }
+}
+
+.animate-bounce-once {
+  animation: bounceOnce 0.5s ease-out;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

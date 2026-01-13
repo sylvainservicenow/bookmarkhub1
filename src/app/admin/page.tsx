@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
-import { ArrowLeft, Users, Bookmark, Tag, Shield, Upload, Loader2, AlertTriangle, Settings, Activity, Clock, Copy } from 'lucide-react'
+import { ArrowLeft, Users, Bookmark, Tag, Shield, Upload, Loader2, AlertTriangle, Settings, Activity, Clock, Copy, MessageCircle } from 'lucide-react'
 
 export default function AdminPage() {
   const { data: session, status } = useSession()
@@ -21,6 +21,7 @@ export default function AdminPage() {
     healthIssues: 0,
     pendingReview: 0,
     duplicates: 0,
+    pendingFeedback: 0,
   })
   const [loading, setLoading] = useState(true)
   const [supabase] = useState(() => createClient())
@@ -57,6 +58,7 @@ export default function AdminPage() {
         { count: healthIssueCount },
         { count: pendingReviewCount },
         { count: duplicateCount },
+        { count: pendingFeedbackCount },
       ] = await Promise.all([
         supabase.from('users').select('*', { count: 'exact', head: true }),
         supabase.from('bookmarks').select('*', { count: 'exact', head: true }),
@@ -65,6 +67,7 @@ export default function AdminPage() {
         supabase.from('bookmarks').select('*', { count: 'exact', head: true }).in('status', ['health_warning_1', 'health_warning_2', 'health_warning_3']),
         supabase.from('bookmarks').select('*', { count: 'exact', head: true }).eq('status', 'submitted'),
         supabase.from('duplicate_candidates').select('*', { count: 'exact', head: true }).eq('reviewed', false),
+        supabase.from('feedback').select('*', { count: 'exact', head: true }).eq('status', 'submitted'),
       ])
 
       setStats({
@@ -75,6 +78,7 @@ export default function AdminPage() {
         healthIssues: healthIssueCount || 0,
         pendingReview: pendingReviewCount || 0,
         duplicates: duplicateCount || 0,
+        pendingFeedback: pendingFeedbackCount || 0,
       })
       setLoading(false)
     }
@@ -121,6 +125,28 @@ export default function AdminPage() {
 
       {/* Alerts Section */}
       <div className="space-y-3 mb-6 sm:mb-8">
+        {stats.pendingFeedback > 0 && (
+          <Link
+            href="/admin/feedback"
+            className="block p-3 sm:p-4 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="p-1.5 sm:p-2 bg-primary-200 rounded-full flex-shrink-0">
+                  <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary-700" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-primary-900 text-sm sm:text-base">User Feedback</h2>
+                  <p className="text-xs sm:text-sm text-primary-700 truncate">
+                    {stats.pendingFeedback} new feedback item{stats.pendingFeedback !== 1 ? 's' : ''} to review
+                  </p>
+                </div>
+              </div>
+              <span className="text-primary-600 font-medium text-sm sm:text-base whitespace-nowrap flex-shrink-0">View →</span>
+            </div>
+          </Link>
+        )}
+
         {stats.unresolvedErrors > 0 && (
           <Link
             href="/admin/errors"
@@ -206,15 +232,15 @@ export default function AdminPage() {
           <div className="text-lg sm:text-2xl font-bold text-gray-900">{stats.tagCount}</div>
           <div className="text-xs sm:text-sm text-gray-500">Tags</div>
         </Link>
-        <Link href="/admin/health" className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-orange-300 hover:shadow-sm transition-all">
-          <Activity className="h-6 w-6 sm:h-8 sm:w-8 text-orange-500 mb-1 sm:mb-2" />
-          <div className="text-lg sm:text-2xl font-bold text-gray-900">{stats.healthIssues + stats.pendingReview}</div>
-          <div className="text-xs sm:text-sm text-gray-500">Needs Attention</div>
+        <Link href="/admin/feedback" className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 hover:border-primary-300 hover:shadow-sm transition-all">
+          <MessageCircle className="h-6 w-6 sm:h-8 sm:w-8 text-primary-500 mb-1 sm:mb-2" />
+          <div className="text-lg sm:text-2xl font-bold text-gray-900">{stats.pendingFeedback}</div>
+          <div className="text-xs sm:text-sm text-gray-500">New Feedback</div>
         </Link>
       </div>
 
       <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Management</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 sm:gap-6">
         <Link href="/admin/users" className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 hover:border-blue-300 hover:shadow-sm transition-all">
           <Users className="h-8 w-8 sm:h-10 sm:w-10 text-blue-500 mb-2 sm:mb-4" />
           <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">Users</h2>
@@ -229,6 +255,11 @@ export default function AdminPage() {
           <Tag className="h-8 w-8 sm:h-10 sm:w-10 text-green-500 mb-2 sm:mb-4" />
           <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">Tags</h2>
           <p className="text-gray-600 text-xs sm:text-sm hidden sm:block">Organize tags</p>
+        </Link>
+        <Link href="/admin/feedback" className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 hover:border-primary-300 hover:shadow-sm transition-all">
+          <MessageCircle className="h-8 w-8 sm:h-10 sm:w-10 text-primary-500 mb-2 sm:mb-4" />
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">Feedback</h2>
+          <p className="text-gray-600 text-xs sm:text-sm hidden sm:block">Review user feedback</p>
         </Link>
         <Link href="/admin/health" className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 hover:border-orange-300 hover:shadow-sm transition-all">
           <Activity className="h-8 w-8 sm:h-10 sm:w-10 text-orange-500 mb-2 sm:mb-4" />
