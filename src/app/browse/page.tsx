@@ -13,7 +13,6 @@ export default async function BrowsePage({
     q?: string
     tag?: string
     tags?: string
-    group?: string
     sort?: string
     rating?: string
   }>
@@ -22,7 +21,6 @@ export default async function BrowsePage({
   const query = params.q || ''
   const tag = params.tag || ''
   const tagsParam = params.tags || ''
-  const group = params.group || ''
   const sort = params.sort || 'recent'
   const minRating = params.rating ? parseInt(params.rating) : 0
   
@@ -50,14 +48,7 @@ export default async function BrowsePage({
     .eq('status', 'active')
     .order('name')
   
-  // Get all groups for filter
-  const { data: allGroups } = await supabase
-    .from('groups')
-    .select('id, name')
-    .eq('status', 'active')
-    .order('name')
-  
-  // Build bookmarks query
+  // Build bookmarks query - show public bookmarks + user's own private bookmarks
   let bookmarksQuery = supabase
     .from('bookmarks')
     .select(`
@@ -67,7 +58,13 @@ export default async function BrowsePage({
       ratings(rating)
     `)
     .eq('status', 'active')
-    .eq('visibility', 'public')
+  
+  // Visibility filter: public OR own bookmarks
+  if (user?.id) {
+    bookmarksQuery = bookmarksQuery.or(`visibility.eq.public,creator_id.eq.${user.id}`)
+  } else {
+    bookmarksQuery = bookmarksQuery.eq('visibility', 'public')
+  }
   
   // Text search
   if (query) {
@@ -197,7 +194,6 @@ export default async function BrowsePage({
               currentSort={sort}
               selectedTags={selectedTags}
               minRating={minRating}
-              groups={allGroups || []}
               searchParams={params}
               topContributors={topContributors}
             />
