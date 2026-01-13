@@ -1,122 +1,57 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Clock, TrendingUp, Star, MessageSquare, X, FolderOpen } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Clock, TrendingUp, Star, MessageSquare, User } from 'lucide-react'
 
 interface FiltersSidebarProps {
   currentSort: string
   selectedTags: string[]
   minRating: number
   groups: { id: string; name: string }[]
-  selectedGroup?: string
-  searchParams: any
+  searchParams: { [key: string]: string | undefined }
   topContributors: { id: string; name: string; count: number }[]
 }
 
 export function FiltersSidebar({ 
   currentSort, 
   selectedTags, 
-  minRating, 
-  groups,
-  selectedGroup,
+  minRating,
   searchParams,
   topContributors 
 }: FiltersSidebarProps) {
-  const router = useRouter()
-  const params = useSearchParams()
-
   const sortOptions = [
-    { value: 'recent', label: 'Most Recent', icon: Clock },
-    { value: 'popular', label: 'Most Popular', icon: TrendingUp },
-    { value: 'rated', label: 'Highest Rated', icon: Star },
-    { value: 'discussed', label: 'Most Discussed', icon: MessageSquare },
+    { id: 'recent', label: 'Most Recent', icon: Clock },
+    { id: 'popular', label: 'Most Popular', icon: TrendingUp },
+    { id: 'rated', label: 'Top Rated', icon: Star },
+    { id: 'discussed', label: 'Most Discussed', icon: MessageSquare },
   ]
 
   const buildUrl = (newParams: Record<string, string | undefined>) => {
-    const current = new URLSearchParams(params.toString())
-    Object.entries(newParams).forEach(([key, value]) => {
-      if (value === undefined || value === '') {
-        current.delete(key)
-      } else {
-        current.set(key, value)
-      }
+    const params = new URLSearchParams()
+    const merged = { ...searchParams, ...newParams }
+    Object.entries(merged).forEach(([key, value]) => {
+      if (value) params.set(key, value)
     })
-    return `/browse?${current.toString()}`
+    return `/browse?${params.toString()}`
   }
-
-  const removeTag = (tagToRemove: string) => {
-    const newTags = selectedTags.filter(t => t !== tagToRemove)
-    router.push(buildUrl({ tags: newTags.join(',') || undefined, tag: undefined }))
-  }
-
-  const clearAllFilters = () => {
-    router.push('/browse')
-  }
-
-  const hasFilters = selectedTags.length > 0 || minRating > 0 || selectedGroup
 
   return (
     <div className="space-y-6">
-      {/* Active Filters */}
-      {hasFilters && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium text-gray-900">Active Filters</h3>
-            <button
-              onClick={clearAllFilters}
-              className="text-xs text-red-600 hover:text-red-700"
-            >
-              Clear all
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {selectedTags.map(tag => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded-full text-sm"
-              >
-                {tag}
-                <button onClick={() => removeTag(tag)} className="hover:text-primary-900">
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-            {selectedGroup && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-sm">
-                <FolderOpen className="h-3 w-3" />
-                Group filter
-                <button onClick={() => router.push(buildUrl({ group: undefined }))} className="hover:text-green-900">
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-            {minRating > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-sm">
-                {minRating}+ stars
-                <button onClick={() => router.push(buildUrl({ rating: undefined }))} className="hover:text-amber-900">
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Sort Options */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <h3 className="font-medium text-gray-900 mb-3">Sort By</h3>
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <h3 className="font-semibold text-gray-900 mb-3">Sort By</h3>
         <div className="space-y-1">
-          {sortOptions.map(option => {
+          {sortOptions.map((option) => {
             const Icon = option.icon
-            const isActive = currentSort === option.value
+            const isActive = currentSort === option.id
             return (
               <Link
-                key={option.value}
-                href={buildUrl({ sort: option.value })}
+                key={option.id}
+                href={buildUrl({ sort: option.id })}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                   isActive
-                    ? 'bg-primary-50 text-primary-700'
+                    ? 'bg-primary-50 text-primary-700 font-medium'
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
@@ -128,62 +63,25 @@ export function FiltersSidebar({
         </div>
       </div>
 
-      {/* Groups Filter (only show if user has groups) */}
-      {groups.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-            <FolderOpen className="h-4 w-4" />
-            My Groups
-          </h3>
-          <div className="space-y-1">
-            <Link
-              href={buildUrl({ group: undefined })}
-              className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                !selectedGroup
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              All bookmarks
-            </Link>
-            {groups.map(group => (
-              <Link
-                key={group.id}
-                href={buildUrl({ group: group.id })}
-                className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                  selectedGroup === group.id
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                {group.name}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Rating Filter */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <h3 className="font-medium text-gray-900 mb-3">Minimum Rating</h3>
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <h3 className="font-semibold text-gray-900 mb-3">Minimum Rating</h3>
         <div className="space-y-1">
-          {[0, 3, 4, 5].map(rating => (
+          {[0, 3, 4, 5].map((rating) => (
             <Link
               key={rating}
-              href={buildUrl({ rating: rating > 0 ? rating.toString() : undefined })}
+              href={buildUrl({ rating: rating > 0 ? String(rating) : undefined })}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                 minRating === rating
-                  ? 'bg-primary-50 text-primary-700'
+                  ? 'bg-primary-50 text-primary-700 font-medium'
                   : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               {rating === 0 ? (
-                'Any rating'
+                'All ratings'
               ) : (
                 <>
-                  {Array.from({ length: rating }).map((_, i) => (
-                    <Star key={i} className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  ))}
+                  <span className="text-amber-500">{'★'.repeat(rating)}</span>
                   <span>& up</span>
                 </>
               )}
@@ -194,14 +92,20 @@ export function FiltersSidebar({
 
       {/* Top Contributors */}
       {topContributors.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h3 className="font-medium text-gray-900 mb-3">Top Contributors</h3>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 className="font-semibold text-gray-900 mb-3">Top Contributors</h3>
           <div className="space-y-2">
             {topContributors.map((contributor, index) => (
-              <div key={contributor.id} className="flex items-center gap-2">
-                <span className="text-xs text-gray-400 w-4">{index + 1}.</span>
-                <span className="text-sm text-gray-700 flex-1 truncate">{contributor.name}</span>
-                <span className="text-xs text-gray-500">{contributor.count}</span>
+              <div
+                key={contributor.id}
+                className="flex items-center gap-2 text-sm"
+              >
+                <span className="w-5 h-5 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-medium">
+                  {index + 1}
+                </span>
+                <User className="h-3 w-3 text-gray-400" />
+                <span className="text-gray-700 truncate flex-1">{contributor.name}</span>
+                <span className="text-gray-400 text-xs">{contributor.count}</span>
               </div>
             ))}
           </div>

@@ -1,8 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, User, Globe, Archive, Pencil, ExternalLink } from 'lucide-react'
-import { FavoriteButton } from '@/components/bookmarks/FavoriteButton'
+import { ArrowLeft, Calendar, User, Globe, Archive } from 'lucide-react'
 import { RatingStars } from '@/components/bookmarks/RatingStars'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 import { CommentSection } from '@/components/comments/CommentSection'
@@ -19,9 +18,9 @@ function getSupabase() {
 export default async function BookmarkPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
-  const { id } = params
+  const { id } = await params
   const supabase = getSupabase()
 
   const { data: bookmark, error } = await supabase
@@ -39,6 +38,7 @@ export default async function BookmarkPage({
     .single()
 
   if (error || !bookmark) {
+    console.error('Bookmark fetch error:', error)
     notFound()
   }
 
@@ -127,7 +127,7 @@ export default async function BookmarkPage({
             {tags.map((tag: any) => (
               <Link
                 key={tag.id}
-                href={`/search?tag=${encodeURIComponent(tag.name)}`}
+                href={`/browse?tag=${encodeURIComponent(tag.name)}`}
                 className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full hover:bg-gray-200 transition-colors"
               >
                 {tag.name}
@@ -152,7 +152,7 @@ export default async function BookmarkPage({
         <div className="flex flex-wrap gap-6 mt-6 pt-6 border-t border-gray-200 text-sm text-gray-500">
           {domain && (
             <Link 
-              href={`/search?domain=${encodeURIComponent(domain)}`}
+              href={`/browse?domain=${encodeURIComponent(domain)}`}
               className="flex items-center gap-2 hover:text-primary-600 transition-colors"
             >
               <Globe className="h-4 w-4" />

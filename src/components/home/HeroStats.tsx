@@ -11,13 +11,12 @@ function getSupabase() {
 export async function HeroStats() {
   const supabase = getSupabase()
   
-  // Fetch counts
+  // Fetch counts - don't filter by visibility for total count
   const [bookmarksResult, usersResult] = await Promise.all([
     supabase
       .from('bookmarks')
       .select('*', { count: 'exact', head: true })
-      .eq('status', 'active')
-      .eq('visibility', 'public'),
+      .eq('status', 'active'),
     supabase
       .from('users')
       .select('*', { count: 'exact', head: true })
