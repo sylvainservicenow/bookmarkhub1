@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { ArrowLeft, Tag, Plus, Settings } from 'lucide-react'
+import { ArrowLeft, Tag, Plus, Settings, Clock } from 'lucide-react'
 import { TagStatusSelect } from '@/components/admin/TagStatusSelect'
 import { CreateTagForm } from '@/components/admin/CreateTagForm'
+import { TagRequestsManager } from '@/components/admin/TagRequestsManager'
 
 export default async function AdminTagsPage() {
   const supabase = await createClient()
@@ -35,6 +36,12 @@ export default async function AdminTagsPage() {
     `)
     .order('name', { ascending: true })
 
+  // Get pending tag requests count
+  const { count: pendingCount } = await supabase
+    .from('tag_requests')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'pending')
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       {/* Header */}
@@ -58,6 +65,23 @@ export default async function AdminTagsPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Pending Tag Requests Section */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <Clock className="h-5 w-5 text-amber-600" />
+          Pending Tag Requests
+          {(pendingCount ?? 0) > 0 && (
+            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-sm rounded-full">
+              {pendingCount}
+            </span>
+          )}
+        </h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Review and approve user-suggested tags. Approved tags will be created and associated with the requesting bookmark.
+        </p>
+        <TagRequestsManager />
       </div>
 
       {/* Create Tag Form */}
