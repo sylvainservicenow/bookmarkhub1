@@ -39,6 +39,21 @@ export function BookmarkActions({ bookmarkId, bookmarkUrl, isArchived, creatorId
   const isCreator = user?.id === creatorId
   const canEdit = isCreator || isAdmin
 
+  // Track click and open URL
+  const handleVisit = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    
+    // Track the click asynchronously
+    try {
+      fetch(`/api/bookmarks/${bookmarkId}/click`, { method: 'POST' })
+    } catch (err) {
+      // Silently fail - don't block navigation
+    }
+    
+    // Open URL immediately
+    window.open(bookmarkUrl, '_blank', 'noopener,noreferrer')
+  }
+
   if (isArchived) {
     return null
   }
@@ -74,16 +89,14 @@ export function BookmarkActions({ bookmarkId, bookmarkUrl, isArchived, creatorId
         </Link>
       )}
       
-      {/* Visit button */}
-      <a
-        href={bookmarkUrl}
-        target="_blank"
-        rel="noopener noreferrer"
+      {/* Visit button with click tracking */}
+      <button
+        onClick={handleVisit}
         className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
       >
         <ExternalLink className="h-4 w-4" />
         Visit
-      </a>
+      </button>
     </div>
   )
 }
