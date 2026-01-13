@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MessageCircle, X, Send, CheckCircle, Loader2 } from 'lucide-react'
+import { Lightbulb, X, Send, CheckCircle, Loader2 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
+import { usePathname } from 'next/navigation'
 
 const TOPICS = [
   { value: 'bug', label: '🐛 Bug Report' },
@@ -14,6 +15,7 @@ const TOPICS = [
 
 export function FloatingFeedback() {
   const { data: session, status } = useSession()
+  const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [topic, setTopic] = useState('')
   const [message, setMessage] = useState('')
@@ -53,13 +55,19 @@ export function FloatingFeedback() {
     setError(null)
 
     try {
-      // Submit to API (which handles database insert and email)
+      // Get full URL for page tracking
+      const pageUrl = typeof window !== 'undefined' 
+        ? window.location.href 
+        : pathname
+
+      // Submit to API (which handles database insert)
       const response = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic,
           message: message.trim(),
+          pageUrl,
         }),
       })
 
@@ -99,7 +107,7 @@ export function FloatingFeedback() {
           {/* Header */}
           <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5 text-white" />
+              <Lightbulb className="h-5 w-5 text-white" />
               <h3 className="text-white font-semibold">Share Feedback</h3>
             </div>
             <button
@@ -204,7 +212,7 @@ export function FloatingFeedback() {
           <X className="h-6 w-6" />
         ) : (
           <>
-            <MessageCircle className="h-6 w-6" />
+            <Lightbulb className="h-6 w-6" />
             {/* Tooltip */}
             <span className="absolute right-full mr-3 px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
               Share Feedback
