@@ -79,6 +79,9 @@ export default async function BookmarkPage({
   const isPrivate = bookmark.visibility === 'private'
   // Use the incremented count for display
   const viewCount = (bookmark.click_count || 0) + 1
+  
+  // Handle users - could be array or single object from Supabase join
+  const userObj = Array.isArray(bookmark.users) ? bookmark.users[0] : bookmark.users
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -185,10 +188,10 @@ export default async function BookmarkPage({
             {new Date(bookmark.created_at).toLocaleDateString()}
           </div>
 
-          {bookmark.users && (
+          {userObj && (
             <div className="flex items-center gap-2">
               <User className="h-4 w-4" />
-              {bookmark.users.name || bookmark.users.email?.split('@')[0]}
+              {userObj.name || userObj.email?.split('@')[0]}
             </div>
           )}
         </div>
