@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
 import { 
   ArrowLeft, 
-  MessageCircle, 
+  Lightbulb, 
   Loader2, 
   CheckCircle, 
   Archive, 
@@ -16,7 +16,8 @@ import {
   Filter,
   RefreshCw,
   Eye,
-  X
+  X,
+  ExternalLink
 } from 'lucide-react'
 
 interface Feedback {
@@ -25,6 +26,7 @@ interface Feedback {
   message: string
   status: string
   admin_notes: string | null
+  page_url: string | null
   created_at: string
   updated_at: string
   reviewed_at: string | null
@@ -79,6 +81,7 @@ export default function AdminFeedbackPage() {
         message,
         status,
         admin_notes,
+        page_url,
         created_at,
         updated_at,
         reviewed_at,
@@ -167,6 +170,17 @@ export default function AdminFeedbackPage() {
     setAdminNotes(feedback.admin_notes || '')
   }
 
+  // Extract page path from URL for display
+  const getPagePath = (url: string | null) => {
+    if (!url) return null
+    try {
+      const urlObj = new URL(url)
+      return urlObj.pathname
+    } catch {
+      return url
+    }
+  }
+
   if (authLoading || loading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
@@ -197,7 +211,7 @@ export default function AdminFeedbackPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary-100 rounded-lg flex-shrink-0">
-              <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" />
+              <Lightbulb className="h-5 w-5 sm:h-6 sm:w-6 text-primary-600" />
             </div>
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">User Feedback</h1>
@@ -244,7 +258,7 @@ export default function AdminFeedbackPage() {
       {/* Feedback List */}
       {feedbacks.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
-          <MessageCircle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <Lightbulb className="h-12 w-12 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No feedback yet</h3>
           <p className="text-gray-600">Feedback from users will appear here</p>
         </div>
@@ -257,6 +271,7 @@ export default function AdminFeedbackPage() {
             const preview = feedback.message.length > 80 
               ? feedback.message.substring(0, 80) + '...' 
               : feedback.message
+            const pagePath = getPagePath(feedback.page_url)
 
             return (
               <div
@@ -284,9 +299,17 @@ export default function AdminFeedbackPage() {
                       </span>
                     </div>
                     <p className="text-gray-700 text-sm mb-2">{preview}</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <User className="h-3 w-3" />
-                      <span>{feedback.user?.name || feedback.user?.email || 'Unknown user'}</span>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        <span>{feedback.user?.name || feedback.user?.email || 'Unknown user'}</span>
+                      </div>
+                      {pagePath && (
+                        <div className="flex items-center gap-1 text-primary-600">
+                          <ExternalLink className="h-3 w-3" />
+                          <span className="truncate max-w-[150px]">{pagePath}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button
@@ -348,6 +371,22 @@ export default function AdminFeedbackPage() {
                   })}
                 </span>
               </div>
+
+              {/* Page URL */}
+              {selectedFeedback.page_url && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Submitted From</label>
+                  <a
+                    href={selectedFeedback.page_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg text-sm text-primary-600 hover:bg-gray-100 transition-colors"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    {getPagePath(selectedFeedback.page_url)}
+                  </a>
+                </div>
+              )}
 
               {/* Message */}
               <div>
