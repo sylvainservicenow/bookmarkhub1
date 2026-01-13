@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Plus, X, Check, FolderOpen, Lock, Loader2, Sparkles } from 'lucide-react'
 import { getFaviconUrl } from '@/lib/utils/favicon'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
@@ -20,7 +20,10 @@ interface GroupType {
 }
 
 export default function SubmitPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
+  
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -43,7 +46,7 @@ export default function SubmitPage() {
   const [supabase] = useState(() => createClient())
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) return
 
     const fetchData = async () => {
       const { data: memberships } = await supabase
@@ -72,7 +75,7 @@ export default function SubmitPage() {
     }
 
     fetchData()
-  }, [user, supabase])
+  }, [user?.id, supabase])
 
   useEffect(() => {
     if (url) {
@@ -180,7 +183,7 @@ export default function SubmitPage() {
     setError(null)
     setLoading(true)
 
-    if (!user) {
+    if (!user?.id) {
       setError('You must be logged in to submit a bookmark')
       setLoading(false)
       return

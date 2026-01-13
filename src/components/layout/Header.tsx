@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useAuth } from '@/contexts/AuthContext'
+import { useSession, signOut } from 'next-auth/react'
 import { BookmarkIcon, User as UserIcon, Plus, Loader2, LogOut } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 
 // Avatar mapping - must match settings page
 const AVATAR_MAP: Record<string, string> = {
@@ -15,11 +16,37 @@ const AVATAR_MAP: Record<string, string> = {
 }
 
 export function Header() {
-  const { user, profile, loading, signOut } = useAuth()
+  const { data: session, status } = useSession()
   const [showDropdown, setShowDropdown] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const loading = status === 'loading'
+  const user = session?.user
 
-  const displayName = profile?.name || user?.email?.split('@')[0] || ''
-  const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
+  // Fetch avatar from profile
+  useEffect(() => {
+    if (user?.id) {
+      const fetchAvatar = async () => {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('users')
+          .select('avatar_url')
+          .eq('id', user.id)
+          .single()
+        if (data?.avatar_url) {
+          setAvatarUrl(data.avatar_url)
+        }
+      }
+      fetchAvatar()
+    }
+  }, [user?.id])
+
+  const displayName = user?.name || user?.email?.split('@')[0] || ''
+  const avatarEmoji = avatarUrl ? AVATAR_MAP[avatarUrl] : null
+
+  const handleSignOut = async () => {
+    setShowDropdown(false)
+    await signOut({ callbackUrl: '/' })
+  }
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -104,10 +131,7 @@ export function Header() {
                         </Link>
                         <hr className="my-1 border-gray-200" />
                         <button
-                          onClick={() => {
-                            setShowDropdown(false)
-                            signOut()
-                          }}
+                          onClick={handleSignOut}
                           className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
                         >
                           <LogOut className="h-4 w-4" />
