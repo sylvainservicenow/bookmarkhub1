@@ -7,6 +7,9 @@ import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 import { CommentSection } from '@/components/comments/CommentSection'
 import { BookmarkActions } from '@/components/bookmarks/BookmarkActions'
 
+// Force dynamic rendering to ensure visibility status is always fresh
+export const dynamic = 'force-dynamic'
+
 export default async function BookmarkPage({
   params,
 }: {
