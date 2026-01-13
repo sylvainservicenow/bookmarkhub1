@@ -1,14 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 import { Clock, TrendingUp, Star, MessageSquare, User } from 'lucide-react'
 
 interface FiltersSidebarProps {
   currentSort: string
   selectedTags: string[]
   minRating: number
-  groups: { id: string; name: string }[]
   searchParams: { [key: string]: string | undefined }
   topContributors: { id: string; name: string; count: number }[]
 }
