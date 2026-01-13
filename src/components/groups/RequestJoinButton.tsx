@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import { UserPlus, Check, X, Loader2, Key } from 'lucide-react'
 
 interface RequestJoinButtonProps {
@@ -12,6 +13,8 @@ interface RequestJoinButtonProps {
 }
 
 export function RequestJoinButton({ groupId, groupName, hasSecretCode }: RequestJoinButtonProps) {
+  const { data: session } = useSession()
+  const user = session?.user
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const [requested, setRequested] = useState(false)
@@ -22,18 +25,15 @@ export function RequestJoinButton({ groupId, groupName, hasSecretCode }: Request
   const supabase = createClient()
 
   const handleRequest = async () => {
-    setLoading(true)
-    setError(null)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
+    if (!user?.id) {
       router.push('/login?redirect=/groups')
       return
     }
 
+    setLoading(true)
+    setError(null)
+
     // Check if already a member or has pending request
-    // Use maybeSingle() to avoid 406 error when no membership exists
     const { data: existing, error: checkError } = await supabase
       .from('group_members')
       .select('id, status')

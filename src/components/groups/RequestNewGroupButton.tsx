@@ -1,10 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import { Plus, X, Check, FolderOpen } from 'lucide-react'
 
 export function RequestNewGroupButton() {
+  const { data: session } = useSession()
+  const user = session?.user
   const [isOpen, setIsOpen] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -17,16 +20,14 @@ export function RequestNewGroupButton() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    const { data: { user } } = await supabase.auth.getUser()
     
-    if (!user) {
+    if (!user?.id) {
       setError('You must be logged in')
-      setLoading(false)
       return
     }
+
+    setLoading(true)
+    setError(null)
 
     if (!name.trim()) {
       setError('Group name is required')

@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { useAuth } from '@/contexts/AuthContext'
-import { createClient } from '@/lib/supabase/client'
-import { useLoadingMonitor } from '@/lib/monitoring'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, ArrowLeft, Loader2, Save } from 'lucide-react'
 import Link from 'next/link'
 
@@ -16,7 +15,9 @@ interface TagType {
 export default function EditBookmarkPage() {
   const params = useParams()
   const bookmarkId = params.id as string
-  const { user, profile, loading: authLoading } = useAuth()
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
   
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
@@ -29,23 +30,19 @@ export default function EditBookmarkPage() {
   const [initialLoading, setInitialLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [permissionDenied, setPermissionDenied] = useState(false)
+  const [profile, setProfile] = useState<{ role: string } | null>(null)
   const mountedRef = useRef(true)
   const fetchedRef = useRef(false)
   const router = useRouter()
   const [supabase] = useState(() => createClient())
 
-  // Monitor for stuck loading states
-  useLoadingMonitor('EditBookmarkPage', authLoading || initialLoading)
-
   useEffect(() => {
     mountedRef.current = true
     
     const init = async () => {
-      // Prevent double-fetching
       if (fetchedRef.current) return
       
       if (!user) {
-        // If auth is done loading and no user, redirect to login
         if (!authLoading) {
           router.push(`/login?redirect=/bookmarks/${bookmarkId}/edit`)
         }
@@ -55,7 +52,18 @@ export default function EditBookmarkPage() {
       fetchedRef.current = true
 
       try {
-        // First, fetch the bookmark without creator restriction
+        // Fetch user profile for admin check
+        const { data: profileData } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        
+        if (mountedRef.current) {
+          setProfile(profileData)
+        }
+
+        // Fetch the bookmark
         const { data: bookmark, error: bookmarkError } = await supabase
           .from('bookmarks')
           .select('*, bookmark_tags (tag_id)')
@@ -79,7 +87,7 @@ export default function EditBookmarkPage() {
 
         // Check permission: must be creator OR admin
         const isCreator = bookmark.creator_id === user.id
-        const isAdmin = profile?.role === 'admin'
+        const isAdmin = profileData?.role === 'admin'
         
         if (!isCreator && !isAdmin) {
           setPermissionDenied(true)
@@ -114,9 +122,8 @@ export default function EditBookmarkPage() {
     }
     
     return () => { mountedRef.current = false }
-  }, [bookmarkId, user, profile, authLoading, supabase, router])
+  }, [bookmarkId, user, authLoading, supabase, router])
 
-  // Reset fetchedRef when bookmarkId changes
   useEffect(() => {
     fetchedRef.current = false
   }, [bookmarkId])
@@ -141,7 +148,6 @@ export default function EditBookmarkPage() {
       await supabase.from('bookmark_tags').insert(selectedTags.map(tagId => ({ bookmark_id: bookmarkId, tag_id: tagId })))
     }
     
-    // Navigate back to the bookmark detail page
     router.push(`/bookmark/${bookmarkId}`)
   }
 

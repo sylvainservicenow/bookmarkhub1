@@ -1,14 +1,23 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth/options'
 import Link from 'next/link'
 import { ArrowLeft, FolderOpen, Users, Lock, Globe, Check } from 'lucide-react'
 import { RequestJoinButton } from '@/components/groups/RequestJoinButton'
 import { RequestNewGroupButton } from '@/components/groups/RequestNewGroupButton'
 import { LeaveGroupButton } from '@/components/groups/LeaveGroupButton'
 
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+
 export default async function GroupsPage() {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = getSupabase()
+  const session = await getServerSession(authOptions)
+  const user = session?.user
   
   // Get all active groups
   const { data: groups } = await supabase
@@ -23,7 +32,7 @@ export default async function GroupsPage() {
   // Get user's group memberships (active only)
   let userMemberships: string[] = []
   let pendingMemberships: string[] = []
-  if (user) {
+  if (user?.id) {
     const { data: memberships } = await supabase
       .from('group_members')
       .select('group_id, status')

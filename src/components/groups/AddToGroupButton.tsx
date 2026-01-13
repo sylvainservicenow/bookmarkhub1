@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import { FolderPlus, X, Check, Loader2 } from 'lucide-react'
 
 interface AddToGroupButtonProps {
@@ -16,6 +17,8 @@ interface GroupType {
 }
 
 export function AddToGroupButton({ bookmarkId, bookmarkTitle }: AddToGroupButtonProps) {
+  const { data: session } = useSession()
+  const user = session?.user
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -29,16 +32,10 @@ export function AddToGroupButton({ bookmarkId, bookmarkTitle }: AddToGroupButton
   const supabase = createClient()
 
   useEffect(() => {
-    if (!showModal) return
+    if (!showModal || !user?.id) return
 
     const fetchData = async () => {
       setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        router.push('/login')
-        return
-      }
 
       // Get user's groups
       const { data: memberships } = await supabase
@@ -76,20 +73,13 @@ export function AddToGroupButton({ bookmarkId, bookmarkTitle }: AddToGroupButton
     }
 
     fetchData()
-  }, [showModal, bookmarkId, supabase, router])
+  }, [showModal, bookmarkId, user?.id, supabase])
 
   const handleSubmit = async () => {
-    if (!selectedGroupId) return
+    if (!selectedGroupId || !user?.id) return
 
     setSubmitting(true)
     setError(null)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      router.push('/login')
-      return
-    }
 
     const { error: insertError } = await supabase
       .from('add_to_group_requests')

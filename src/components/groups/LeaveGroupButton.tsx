@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import { LogOut, Loader2 } from 'lucide-react'
 
 interface LeaveGroupButtonProps {
@@ -11,20 +12,20 @@ interface LeaveGroupButtonProps {
 }
 
 export function LeaveGroupButton({ groupId, groupName }: LeaveGroupButtonProps) {
+  const { data: session } = useSession()
+  const user = session?.user
   const [loading, setLoading] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   const handleLeave = async () => {
-    setLoading(true)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
+    if (!user?.id) {
       router.push('/login')
       return
     }
+
+    setLoading(true)
 
     // Delete from group_members
     await supabase
