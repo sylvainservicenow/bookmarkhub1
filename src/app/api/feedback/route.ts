@@ -1,9 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { authOptions } from '@/lib/auth/options'
 
 const VALID_TOPICS = ['bug', 'feature', 'improvement', 'content', 'other']
+
+// Create admin client to bypass RLS (since we use NextAuth, not Supabase Auth)
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!url || !serviceKey) {
+    throw new Error('Missing Supabase environment variables')
+  }
+  
+  return createClient(url, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { topic, message } = body
+    const { topic, message, pageUrl } = body
 
     // Validate required fields
     if (!topic || !message?.trim()) {
@@ -35,22 +52,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
+    const supabaseAdmin = getSupabaseAdmin()
 
     // Get user info for logging
-    const { data: userData } = await supabase
+    const { data: userData } = await supabaseAdmin
       .from('users')
       .select('name, email')
       .eq('id', session.user.id)
       .single()
 
     // Insert feedback into database
-    const { data: feedback, error: insertError } = await supabase
+    const { data: feedback, error: insertError } = await supabaseAdmin
       .from('feedback')
       .insert({
         user_id: session.user.id,
         topic,
         message: message.trim(),
+        page_url: pageUrl || null,
         status: 'submitted'
       })
       .select()
@@ -64,7 +82,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Log the feedback (email can be added later with Resend package)
+    // Log the feedback
     const topicLabels: Record<string, string> = {
       bug: '🐛 Bug Report',
       feature: '✨ Feature Request',
@@ -77,13 +95,9 @@ export async function POST(request: NextRequest) {
       id: feedback.id,
       topic: topicLabels[topic],
       from: userData?.name || session.user.email,
+      page: pageUrl || 'unknown',
       preview: message.trim().substring(0, 50) + (message.trim().length > 50 ? '...' : '')
     })
-
-    // TODO: Email notification can be added later by:
-    // 1. npm install resend
-    // 2. Add RESEND_API_KEY to env
-    // 3. Uncomment and use Resend to send email to admin@mybookmarkhub.com
 
     return NextResponse.json({ 
       success: true, 
