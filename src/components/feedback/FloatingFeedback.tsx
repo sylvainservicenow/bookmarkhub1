@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { MessageCircle, X, Send, CheckCircle, Loader2 } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
 
 const TOPICS = [
   { value: 'bug', label: '🐛 Bug Report' },
@@ -14,14 +13,13 @@ const TOPICS = [
 ]
 
 export function FloatingFeedback() {
-  const { user, loading: authLoading } = useAuth()
+  const { data: session, status } = useSession()
   const [isOpen, setIsOpen] = useState(false)
   const [topic, setTopic] = useState('')
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [supabase] = useState(() => createClient())
 
   // Reset form when closing
   useEffect(() => {
@@ -39,7 +37,7 @@ export function FloatingFeedback() {
   }, [isOpen, showSuccess])
 
   // Don't render for non-authenticated users or while loading
-  if (authLoading || !user) {
+  if (status === 'loading' || !session?.user) {
     return null
   }
 
