@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, User, Globe, Archive, Lock } from 'lucide-react'
+import { ArrowLeft, Calendar, User, Globe, Archive, Lock, Eye } from 'lucide-react'
 import { RatingStars } from '@/components/bookmarks/RatingStars'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 import { CommentSection } from '@/components/comments/CommentSection'
@@ -36,6 +36,12 @@ export default async function BookmarkPage({
     notFound()
   }
 
+  // Increment view count on every page load
+  await supabase
+    .from('bookmarks')
+    .update({ click_count: (bookmark.click_count || 0) + 1 })
+    .eq('id', id)
+
   // Filter to only show active tags
   const tags = bookmark.bookmark_tags
     ?.map((bt: any) => bt.tags)
@@ -59,6 +65,8 @@ export default async function BookmarkPage({
 
   const isArchived = bookmark.status === 'archived'
   const isPrivate = bookmark.visibility === 'private'
+  // Use the incremented count for display
+  const viewCount = (bookmark.click_count || 0) + 1
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -154,6 +162,11 @@ export default async function BookmarkPage({
               {domain}
             </Link>
           )}
+
+          <div className="flex items-center gap-2">
+            <Eye className="h-4 w-4" />
+            {viewCount} view{viewCount !== 1 ? 's' : ''}
+          </div>
 
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
