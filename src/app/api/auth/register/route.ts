@@ -1,17 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-)
-
 export async function POST(request: NextRequest) {
   try {
     const { email, password, name } = await request.json()
@@ -20,6 +9,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Email, password, and name are required' },
         { status: 400 }
+      )
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!supabaseUrl || !serviceKey) {
+      console.error('Missing Supabase environment variables')
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      )
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+
+    // Check if user already exists
+    const { data: existingUser } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .single()
+
+    if (existingUser) {
+      return NextResponse.json(
+        { error: 'An account with this email already exists' },
+        { status: 409 }
       )
     }
 
@@ -69,21 +90,18 @@ export async function POST(request: NextRequest) {
     if (profileError) {
       console.error('Profile creation error:', profileError)
       // User was created in auth, but profile failed
-      // This is okay, it will be created on first login
+      // This is okay, the trigger should handle it or it will be created on first login
     }
 
-    // Send confirmation email
-    const { error: emailError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'signup',
-      email,
-      options: {
-        redirectTo: `${process.env.NEXTAUTH_URL}/auth/callback`,
-      },
-    })
-
-    if (emailError) {
-      console.error('Email generation error:', emailError)
-      // Continue anyway, user can request new confirmation
+    // Send confirmation email using inviteUserByEmail which sends confirmation
+    // Note: The user was created above, this just sends the email
+    try {
+      await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/login?confirmed=true`,
+      })
+    } catch (emailError) {
+      console.error('Email sending error:', emailError)
+      // Continue anyway - user can request new confirmation from login page
     }
 
     return NextResponse.json({

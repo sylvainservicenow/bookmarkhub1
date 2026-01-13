@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import { createClient } from '@/lib/supabase/client'
+import { useSession, signOut } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
 import { LogOut, Plus, Bookmark, Heart, User, Search, ExternalLink, Calendar, Mail, Edit, Archive, Shield, Loader2 } from 'lucide-react'
 
@@ -15,8 +15,19 @@ const AVATAR_MAP: Record<string, string> = {
   flower: '🌸', tree: '🌳', mountain: '🏔️', crystal: '💎', robot: '🤖',
 }
 
+interface Profile {
+  name: string | null
+  avatar_url: string | null
+  role: string
+  created_at: string | null
+}
+
 export default function DashboardPage() {
-  const { user, profile, signOut, loading: authLoading } = useAuth()
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
+  
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [stats, setStats] = useState({
     bookmarkCount: 0,
     archivedCount: 0,
@@ -28,9 +39,18 @@ export default function DashboardPage() {
   const [supabase] = useState(() => createClient())
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) return
 
     const fetchData = async () => {
+      // Fetch profile
+      const { data: profileData } = await supabase
+        .from('users')
+        .select('name, avatar_url, role, created_at')
+        .eq('id', user.id)
+        .single()
+      
+      setProfile(profileData)
+
       // Fetch user's active bookmarks count
       const { count: bookmarkCount } = await supabase
         .from('bookmarks')
@@ -83,7 +103,11 @@ export default function DashboardPage() {
     }
 
     fetchData()
-  }, [user, supabase])
+  }, [user?.id, supabase])
+
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: '/' })
+  }
 
   if (authLoading || loading) {
     return (
@@ -100,9 +124,9 @@ export default function DashboardPage() {
     return null // Middleware will redirect
   }
 
-  const displayName = profile?.name || user.email?.split('@')[0]
+  const displayName = profile?.name || user.name || user.email?.split('@')[0]
   const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = profile?.role === 'admin' || user.role === 'admin'
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">
@@ -127,7 +151,7 @@ export default function DashboardPage() {
             </p>
             <p className="text-gray-400 text-xs flex items-center gap-1 mt-1">
               <Calendar className="h-3 w-3" />
-              Member since {new Date(profile?.created_at || user.created_at || Date.now()).toLocaleDateString()}
+              Member since {new Date(profile?.created_at || Date.now()).toLocaleDateString()}
             </p>
           </div>
         </div>
@@ -149,7 +173,7 @@ export default function DashboardPage() {
             Edit Profile
           </Link>
           <button
-            onClick={signOut}
+            onClick={handleSignOut}
             className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <LogOut className="h-4 w-4" />

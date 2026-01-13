@@ -1,19 +1,23 @@
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { createClient } from '@supabase/supabase-js'
-import bcrypt from 'bcryptjs'
 
-// Create admin Supabase client for auth operations
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
+// Lazy initialization of Supabase admin client
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!url || !serviceKey) {
+    throw new Error('Missing Supabase environment variables')
+  }
+  
+  return createClient(url, serviceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
     }
-  }
-)
+  })
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -29,71 +33,26 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          // Get user from auth.users
-          const { data: authUsers, error: authError } = await supabaseAdmin
-            .from('auth.users')
-            .select('id, email, encrypted_password, email_confirmed_at')
-            .eq('email', credentials.email.toLowerCase())
-            .single()
+          const supabaseAdmin = getSupabaseAdmin()
+          
+          // Use Supabase auth to verify credentials
+          const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+            email: credentials.email,
+            password: credentials.password,
+          })
 
-          // If not found in view, try direct auth
-          if (authError || !authUsers) {
-            // Use Supabase auth to verify credentials
-            const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
-              email: credentials.email,
-              password: credentials.password,
-            })
-
-            if (signInError || !signInData.user) {
-              throw new Error('Invalid email or password')
+          if (signInError || !signInData.user) {
+            if (signInError?.message?.includes('Email not confirmed')) {
+              throw new Error('Please confirm your email before signing in')
             }
-
-            // Get user profile
-            const { data: profile } = await supabaseAdmin
-              .from('users')
-              .select('id, name, email, avatar_url, role, status')
-              .eq('id', signInData.user.id)
-              .single()
-
-            if (profile?.status === 'suspended') {
-              throw new Error('Your account has been suspended')
-            }
-
-            if (profile?.status === 'archived') {
-              throw new Error('Your account has been archived')
-            }
-
-            // Sign out from Supabase (we're using NextAuth sessions)
-            await supabaseAdmin.auth.signOut()
-
-            return {
-              id: signInData.user.id,
-              email: signInData.user.email!,
-              name: profile?.name || signInData.user.email!.split('@')[0],
-              image: profile?.avatar_url,
-              role: profile?.role || 'user',
-            }
-          }
-
-          // Manual password verification if we got the user directly
-          const isValidPassword = await bcrypt.compare(
-            credentials.password,
-            authUsers.encrypted_password
-          )
-
-          if (!isValidPassword) {
             throw new Error('Invalid email or password')
-          }
-
-          if (!authUsers.email_confirmed_at) {
-            throw new Error('Please confirm your email before signing in')
           }
 
           // Get user profile
           const { data: profile } = await supabaseAdmin
             .from('users')
             .select('id, name, email, avatar_url, role, status')
-            .eq('id', authUsers.id)
+            .eq('id', signInData.user.id)
             .single()
 
           if (profile?.status === 'suspended') {
@@ -105,9 +64,9 @@ export const authOptions: NextAuthOptions = {
           }
 
           return {
-            id: authUsers.id,
-            email: authUsers.email!,
-            name: profile?.name || authUsers.email!.split('@')[0],
+            id: signInData.user.id,
+            email: signInData.user.email!,
+            name: profile?.name || signInData.user.email!.split('@')[0],
             image: profile?.avatar_url,
             role: profile?.role || 'user',
           }
@@ -137,6 +96,7 @@ export const authOptions: NextAuthOptions = {
       // Refresh user data from database periodically
       if (token.id && Date.now() - (token.lastRefresh as number || 0) > 5 * 60 * 1000) {
         try {
+          const supabaseAdmin = getSupabaseAdmin()
           const { data: profile } = await supabaseAdmin
             .from('users')
             .select('name, avatar_url, role, status')
