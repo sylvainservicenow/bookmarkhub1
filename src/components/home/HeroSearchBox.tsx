@@ -3,11 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Loader2 } from 'lucide-react'
+import { homepageConfig } from '@/config/homepage'
 
 export function HeroSearchBox() {
   const [query, setQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const router = useRouter()
+  
+  const { searchPlaceholder, searchButtonText } = homepageConfig.hero
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,14 +44,14 @@ export function HeroSearchBox() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search bookmarks, tags, or groups..."
+          placeholder={searchPlaceholder}
           className="w-full pl-14 pr-28 py-4 text-lg bg-white border border-gray-200 rounded-full shadow-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all placeholder:text-gray-400"
         />
         <button
           type="submit"
           className="absolute right-2 top-1/2 -translate-y-1/2 px-5 py-2.5 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors font-medium text-sm"
         >
-          Search
+          {searchButtonText}
         </button>
       </div>
     </form>
