@@ -7,8 +7,9 @@ import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 import { CommentSection } from '@/components/comments/CommentSection'
 import { BookmarkActions } from '@/components/bookmarks/BookmarkActions'
 
-// Force dynamic rendering to ensure visibility status is always fresh
+// Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export default async function BookmarkPage({
   params,
@@ -18,10 +19,20 @@ export default async function BookmarkPage({
   const { id } = params
   const supabase = createAdminClient()
 
+  // Fetch bookmark with all related data
   const { data: bookmark, error } = await supabase
     .from('bookmarks')
     .select(`
-      *,
+      id,
+      title,
+      url,
+      description,
+      visibility,
+      status,
+      click_count,
+      favicon_url,
+      created_at,
+      creator_id,
       users:creator_id (name, email),
       bookmark_tags (
         tags (id, name, status)
@@ -64,6 +75,7 @@ export default async function BookmarkPage({
   } catch {}
 
   const isArchived = bookmark.status === 'archived'
+  // Check visibility - default to public if not set
   const isPrivate = bookmark.visibility === 'private'
   // Use the incremented count for display
   const viewCount = (bookmark.click_count || 0) + 1
@@ -181,7 +193,7 @@ export default async function BookmarkPage({
           )}
         </div>
 
-        {/* Status badges */}
+        {/* Visibility badge */}
         <div className="mt-4 flex gap-2">
           {isPrivate ? (
             <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
