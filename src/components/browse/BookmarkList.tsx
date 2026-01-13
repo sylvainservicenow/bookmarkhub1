@@ -1,18 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { Star, MessageSquare, ExternalLink, Heart, Eye, FolderOpen, Lock } from 'lucide-react'
+import { Star, MessageSquare, ExternalLink, Heart, Eye } from 'lucide-react'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
-import { AddToGroupButton } from '@/components/groups/AddToGroupButton'
 
 interface BookmarkListProps {
   bookmarks: any[]
   userFavorites: string[]
   totalCount: number
-  showAddToGroup?: boolean
 }
 
-export function BookmarkList({ bookmarks, userFavorites, totalCount, showAddToGroup }: BookmarkListProps) {
+export function BookmarkList({ bookmarks, userFavorites, totalCount }: BookmarkListProps) {
   if (bookmarks.length === 0) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
@@ -38,8 +36,6 @@ export function BookmarkList({ bookmarks, userFavorites, totalCount, showAddToGr
             ? ratings.reduce((sum: number, r: any) => sum + r.rating, 0) / ratings.length
             : 0
           const tags = bookmark.bookmark_tags?.map((bt: any) => bt.tags).filter(Boolean) || []
-          const groups = bookmark.bookmark_groups || []
-          const isRestricted = bookmark.visibility === 'restricted'
           const userObj = Array.isArray(bookmark.users) ? bookmark.users[0] : bookmark.users
 
           return (
@@ -68,12 +64,6 @@ export function BookmarkList({ bookmarks, userFavorites, totalCount, showAddToGr
                         >
                           {bookmark.title}
                         </Link>
-                        {isRestricted && (
-                          <span className="shrink-0 flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                            <Lock className="h-3 w-3" />
-                            Restricted
-                          </span>
-                        )}
                       </div>
                       <a
                         href={bookmark.url}
@@ -130,9 +120,6 @@ export function BookmarkList({ bookmarks, userFavorites, totalCount, showAddToGr
                     </span>
                     {userObj?.name && (
                       <span>by {userObj.name}</span>
-                    )}
-                    {showAddToGroup && bookmark.visibility === 'public' && (
-                      <AddToGroupButton bookmarkId={bookmark.id} bookmarkTitle={bookmark.title} />
                     )}
                   </div>
                 </div>
