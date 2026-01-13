@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { 
   Bookmark, ArrowLeft, Plus, Archive, CheckSquare, Square, 
   Loader2, Filter, ArrowUpDown, Clock, Eye, EyeOff, RotateCcw,
-  CheckCircle
+  CheckCircle, Globe, Lock
 } from 'lucide-react'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 
@@ -302,13 +302,14 @@ export default function MyBookmarksPage() {
 
       {visibleBookmarks.length > 0 ? (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <div className="grid grid-cols-[auto,1fr,auto,auto] gap-4 px-4 py-3 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+          <div className="grid grid-cols-[auto,1fr,auto,auto,auto] gap-4 px-4 py-3 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
             <div className="flex items-center">
               <button onClick={toggleSelectAll} className="p-1 hover:bg-gray-200 rounded transition-colors">
                 {selectedIds.size === visibleBookmarks.length ? <CheckSquare className="h-5 w-5 text-primary-600" /> : <Square className="h-5 w-5 text-gray-400" />}
               </button>
             </div>
             <div>Bookmark</div>
+            <div>Visibility</div>
             <div>Status</div>
             <div>Actions</div>
           </div>
@@ -316,8 +317,9 @@ export default function MyBookmarksPage() {
           <div className="divide-y divide-gray-200">
             {visibleBookmarks.map((bookmark) => {
               const isLoading = loadingIds.has(bookmark.id)
+              const isPrivate = bookmark.visibility === 'private'
               return (
-                <div key={bookmark.id} className={`grid grid-cols-[auto,1fr,auto,auto] gap-4 px-4 py-3 items-center transition-colors ${selectedIds.has(bookmark.id) ? 'bg-primary-50' : 'hover:bg-gray-50'} ${bookmark.status === 'archived' ? 'opacity-60' : ''}`}>
+                <div key={bookmark.id} className={`grid grid-cols-[auto,1fr,auto,auto,auto] gap-4 px-4 py-3 items-center transition-colors ${selectedIds.has(bookmark.id) ? 'bg-primary-50' : 'hover:bg-gray-50'} ${bookmark.status === 'archived' ? 'opacity-60' : ''}`}>
                   <div>
                     <button onClick={() => toggleSelect(bookmark.id)} className="p-1 hover:bg-gray-200 rounded transition-colors">
                       {selectedIds.has(bookmark.id) ? <CheckSquare className="h-5 w-5 text-primary-600" /> : <Square className="h-5 w-5 text-gray-400" />}
@@ -337,6 +339,20 @@ export default function MyBookmarksPage() {
                         <span key={bt.tags.id} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">{bt.tags.name}</span>
                       ))}
                     </div>
+                  </div>
+
+                  <div>
+                    {isPrivate ? (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full flex items-center gap-1">
+                        <Lock className="h-3 w-3" />
+                        Private
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full flex items-center gap-1">
+                        <Globe className="h-3 w-3" />
+                        Public
+                      </span>
+                    )}
                   </div>
 
                   <div>
