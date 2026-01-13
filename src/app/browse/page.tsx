@@ -205,6 +205,10 @@ export default async function BrowsePage({
               bookmarks={filteredBookmarks}
               userFavorites={userFavorites}
               totalCount={filteredBookmarks.length}
+              query={query}
+              selectedTags={selectedTags}
+              minRating={minRating}
+              sort={sort}
             />
           </main>
           
