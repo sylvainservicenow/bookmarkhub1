@@ -1,10 +1,16 @@
 import { HeroSearchBox } from './HeroSearchBox'
 import { HeroStats } from './HeroStats'
 import { Sparkles } from 'lucide-react'
-import { homepageConfig } from '@/config/homepage'
+import { getSettings } from '@/lib/settings'
 
-export function HeroSection() {
-  const { badge, title, subtitle } = homepageConfig.hero
+export async function HeroSection() {
+  const settings = await getSettings()
+  
+  const badge = settings.homepage_badge
+  const title = settings.homepage_title
+  const subtitle = settings.homepage_subtitle
+  const searchPlaceholder = settings.homepage_search_placeholder
+  const searchButtonText = settings.homepage_search_button
   
   return (
     <section className="bg-hero-gradient bg-hero-pattern">
@@ -28,7 +34,10 @@ export function HeroSection() {
         </p>
         
         {/* Search Box */}
-        <HeroSearchBox />
+        <HeroSearchBox 
+          placeholder={searchPlaceholder}
+          buttonText={searchButtonText}
+        />
         
         {/* Stats */}
         <HeroStats />

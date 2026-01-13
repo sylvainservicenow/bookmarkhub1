@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
-import { ArrowLeft, Users, Bookmark, Tag, Shield, CheckSquare, Upload, Loader2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Users, Bookmark, Tag, Shield, CheckSquare, Upload, Loader2, AlertTriangle, Settings } from 'lucide-react'
 
 export default function AdminPage() {
   const { data: session, status } = useSession()
@@ -156,7 +156,7 @@ export default function AdminPage() {
       </div>
 
       <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Management</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6">
         <Link href="/admin/users" className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 hover:border-blue-300 hover:shadow-sm transition-all">
           <Users className="h-8 w-8 sm:h-10 sm:w-10 text-blue-500 mb-2 sm:mb-4" />
           <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">Users</h2>
@@ -181,6 +181,11 @@ export default function AdminPage() {
           <Upload className="h-8 w-8 sm:h-10 sm:w-10 text-indigo-500 mb-2 sm:mb-4" />
           <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">Import</h2>
           <p className="text-gray-600 text-xs sm:text-sm hidden sm:block">Bulk import bookmarks</p>
+        </Link>
+        <Link href="/admin/settings" className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 hover:border-purple-300 hover:shadow-sm transition-all">
+          <Settings className="h-8 w-8 sm:h-10 sm:w-10 text-purple-500 mb-2 sm:mb-4" />
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">Settings</h2>
+          <p className="text-gray-600 text-xs sm:text-sm hidden sm:block">Homepage content</p>
         </Link>
       </div>
     </div>
