@@ -36,6 +36,7 @@ export default function DashboardPage() {
   const [recentBookmarks, setRecentBookmarks] = useState<any[]>([])
   const [recentFavorites, setRecentFavorites] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [signingOut, setSigningOut] = useState(false)
   const [supabase] = useState(() => createClient())
 
   useEffect(() => {
@@ -106,15 +107,25 @@ export default function DashboardPage() {
   }, [user?.id, supabase])
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: '/' })
+    setSigningOut(true)
+    try {
+      // Use redirect: false to handle manually, then redirect
+      await signOut({ redirect: false })
+      // Force a hard navigation to clear all state
+      window.location.href = '/'
+    } catch (error) {
+      console.error('Sign out error:', error)
+      // Fallback: force navigation anyway
+      window.location.href = '/'
+    }
   }
 
-  if (authLoading || loading) {
+  if (authLoading || loading || signingOut) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
         <div className="flex items-center gap-2 text-gray-500">
           <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Loading dashboard...</span>
+          <span>{signingOut ? 'Signing out...' : 'Loading dashboard...'}</span>
         </div>
       </div>
     )

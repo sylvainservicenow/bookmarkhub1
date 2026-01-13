@@ -19,6 +19,7 @@ export function Header() {
   const { data: session, status } = useSession()
   const [showDropdown, setShowDropdown] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [signingOut, setSigningOut] = useState(false)
   const loading = status === 'loading'
   const user = session?.user
 
@@ -45,7 +46,17 @@ export function Header() {
 
   const handleSignOut = async () => {
     setShowDropdown(false)
-    await signOut({ callbackUrl: '/' })
+    setSigningOut(true)
+    try {
+      // Use redirect: false to handle manually, then redirect
+      await signOut({ redirect: false })
+      // Force a hard navigation to clear all state
+      window.location.href = '/'
+    } catch (error) {
+      console.error('Sign out error:', error)
+      // Fallback: force navigation anyway
+      window.location.href = '/'
+    }
   }
 
   return (
@@ -60,10 +71,10 @@ export function Header() {
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            {loading ? (
+            {loading || signingOut ? (
               <div className="flex items-center gap-2 text-gray-400">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                <span className="text-sm hidden sm:inline">Loading...</span>
+                <span className="text-sm hidden sm:inline">{signingOut ? 'Signing out...' : 'Loading...'}</span>
               </div>
             ) : user ? (
               <>
