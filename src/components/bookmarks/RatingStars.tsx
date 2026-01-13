@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useAuth } from '@/contexts/AuthContext'
+import { createClient } from '@/lib/supabase/client-with-auth'
+import { useSession } from 'next-auth/react'
 import { Star, Loader2 } from 'lucide-react'
 
 interface RatingStarsProps {
@@ -12,7 +12,8 @@ interface RatingStarsProps {
 }
 
 export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingStarsProps) {
-  const { user } = useAuth()
+  const { data: session } = useSession()
+  const user = session?.user
   const [userRating, setUserRating] = useState<number | null>(null)
   const [hoverRating, setHoverRating] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -26,7 +27,6 @@ export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingS
     if (!mountedRef.current) return
     
     try {
-      // Use maybeSingle() instead of single() to handle 0 rows gracefully
       const { data, error } = await supabase
         .from('ratings')
         .select('rating')
@@ -53,7 +53,7 @@ export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingS
   useEffect(() => {
     mountedRef.current = true
 
-    if (user) {
+    if (user?.id) {
       fetchUserRating(user.id)
     } else {
       setLoading(false)
@@ -62,10 +62,10 @@ export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingS
     return () => {
       mountedRef.current = false
     }
-  }, [user, fetchUserRating])
+  }, [user?.id, fetchUserRating])
 
   const handleRate = async (rating: number) => {
-    if (!user) {
+    if (!user?.id) {
       window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
       return
     }
@@ -74,7 +74,6 @@ export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingS
 
     try {
       if (userRating) {
-        // Update existing rating
         const { error } = await supabase
           .from('ratings')
           .update({ rating })
@@ -83,11 +82,9 @@ export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingS
         
         if (error) throw error
 
-        // Recalculate average (approximate - replace old with new)
         const newTotal = (currentAverage * currentTotal - userRating + rating) / currentTotal
         setCurrentAverage(newTotal)
       } else {
-        // Insert new rating
         const { error } = await supabase
           .from('ratings')
           .insert({
@@ -98,7 +95,6 @@ export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingS
         
         if (error) throw error
 
-        // Recalculate average
         const newTotal = currentTotal + 1
         const newAverage = (currentAverage * currentTotal + rating) / newTotal
         setCurrentAverage(newAverage)
@@ -156,7 +152,7 @@ export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingS
       {/* Sign in prompt */}
       {!user && !loading && (
         <a 
-          href={`/login?redirect=${encodeURIComponent(window.location.pathname)}`}
+          href={`/login?redirect=${encodeURIComponent(typeof window !== 'undefined' ? window.location.pathname : '')}`}
           className="text-sm text-primary-600 hover:underline"
         >
           Sign in to rate

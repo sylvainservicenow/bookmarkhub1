@@ -1,21 +1,42 @@
 'use client'
 
 import Link from 'next/link'
-import { useAuth } from '@/contexts/AuthContext'
-import { Pencil, ExternalLink, LogIn } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { Pencil, ExternalLink, LogIn, Loader2 } from 'lucide-react'
 import { FavoriteButton } from './FavoriteButton'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 
 interface BookmarkActionsProps {
   bookmarkId: string
   bookmarkUrl: string
   isArchived: boolean
-  isCreator: boolean
+  creatorId: string
 }
 
-export function BookmarkActions({ bookmarkId, bookmarkUrl, isArchived, isCreator }: BookmarkActionsProps) {
-  const { user, profile, loading } = useAuth()
+export function BookmarkActions({ bookmarkId, bookmarkUrl, isArchived, creatorId }: BookmarkActionsProps) {
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const loading = status === 'loading'
+  const [isAdmin, setIsAdmin] = useState(false)
   
-  const isAdmin = profile?.role === 'admin'
+  // Check if user is admin
+  useEffect(() => {
+    if (user?.id) {
+      const checkAdmin = async () => {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        setIsAdmin(data?.role === 'admin')
+      }
+      checkAdmin()
+    }
+  }, [user?.id])
+  
+  const isCreator = user?.id === creatorId
   const canEdit = isCreator || isAdmin
 
   if (isArchived) {
@@ -24,6 +45,10 @@ export function BookmarkActions({ bookmarkId, bookmarkUrl, isArchived, isCreator
 
   return (
     <div className="flex items-center gap-2 shrink-0">
+      {loading && (
+        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+      )}
+      
       {/* Show favorite button only if logged in */}
       {user && <FavoriteButton bookmarkId={bookmarkId} />}
       

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useAuth } from '@/contexts/AuthContext'
+import { useState, useRef, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client-with-auth'
+import { useSession } from 'next-auth/react'
 import { MessageCircle, Loader2, Trash2, Send, LogIn } from 'lucide-react'
 import Link from 'next/link'
 
@@ -17,11 +17,12 @@ interface Comment {
 interface CommentSectionProps {
   bookmarkId: string
   initialComments: Comment[]
-  isAdmin: boolean
 }
 
-export function CommentSection({ bookmarkId, initialComments, isAdmin }: CommentSectionProps) {
-  const { user, profile } = useAuth()
+export function CommentSection({ bookmarkId, initialComments }: CommentSectionProps) {
+  const { data: session } = useSession()
+  const user = session?.user
+  const [profile, setProfile] = useState<{ name: string | null; role: string } | null>(null)
   const [comments, setComments] = useState<Comment[]>(initialComments)
   const [newComment, setNewComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -29,14 +30,31 @@ export function CommentSection({ bookmarkId, initialComments, isAdmin }: Comment
   const [supabase] = useState(() => createClient())
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Fetch user profile
+  useEffect(() => {
+    if (user?.id) {
+      const fetchProfile = async () => {
+        const { data } = await supabase
+          .from('users')
+          .select('name, role')
+          .eq('id', user.id)
+          .single()
+        setProfile(data)
+      }
+      fetchProfile()
+    }
+  }, [user?.id, supabase])
+
+  const isAdmin = profile?.role === 'admin'
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user || !newComment.trim()) return
+    if (!user?.id || !newComment.trim()) return
 
     setSubmitting(true)
 
     try {
-      const authorName = profile?.name || user.email?.split('@')[0] || 'Anonymous'
+      const authorName = profile?.name || user.name || user.email?.split('@')[0] || 'Anonymous'
       
       const { data, error } = await supabase
         .from('comments')
@@ -65,7 +83,7 @@ export function CommentSection({ bookmarkId, initialComments, isAdmin }: Comment
   }
 
   const handleDelete = async (commentId: string) => {
-    if (!user) return
+    if (!user?.id) return
     
     setDeletingId(commentId)
 
@@ -87,13 +105,12 @@ export function CommentSection({ bookmarkId, initialComments, isAdmin }: Comment
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setNewComment(e.target.value)
-    // Auto-resize
     e.target.style.height = 'auto'
     e.target.style.height = `${e.target.scrollHeight}px`
   }
 
   const canDelete = (comment: Comment) => {
-    if (!user) return false
+    if (!user?.id) return false
     return comment.author_id === user.id || isAdmin
   }
 

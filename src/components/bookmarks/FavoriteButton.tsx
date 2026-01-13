@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useAuth } from '@/contexts/AuthContext'
+import { createClient } from '@/lib/supabase/client-with-auth'
+import { useSession } from 'next-auth/react'
 import { Heart, Loader2 } from 'lucide-react'
 
 interface FavoriteButtonProps {
@@ -11,7 +11,8 @@ interface FavoriteButtonProps {
 }
 
 export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonProps) {
-  const { user } = useAuth()
+  const { data: session } = useSession()
+  const user = session?.user
   const [isFavorited, setIsFavorited] = useState(initialFavorited ?? false)
   const [loading, setLoading] = useState(true)
   const [supabase] = useState(() => createClient())
@@ -23,7 +24,6 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
     if (!mountedRef.current) return
     
     try {
-      // Use maybeSingle() instead of single() to handle 0 rows gracefully
       const { data, error } = await supabase
         .from('favorites')
         .select('id')
@@ -50,7 +50,7 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
   useEffect(() => {
     mountedRef.current = true
 
-    if (user) {
+    if (user?.id) {
       checkFavoriteStatus(user.id)
     } else {
       setLoading(false)
@@ -59,10 +59,10 @@ export function FavoriteButton({ bookmarkId, initialFavorited }: FavoriteButtonP
     return () => {
       mountedRef.current = false
     }
-  }, [user, checkFavoriteStatus])
+  }, [user?.id, checkFavoriteStatus])
 
   const toggleFavorite = async () => {
-    if (!user) {
+    if (!user?.id) {
       window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
       return
     }

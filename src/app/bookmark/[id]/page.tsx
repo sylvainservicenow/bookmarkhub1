@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { ArrowLeft, Calendar, User, Globe, Archive, Pencil, ExternalLink } from 'lucide-react'
 import { FavoriteButton } from '@/components/bookmarks/FavoriteButton'
@@ -8,27 +8,21 @@ import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 import { CommentSection } from '@/components/comments/CommentSection'
 import { BookmarkActions } from '@/components/bookmarks/BookmarkActions'
 
+// Create a server-side Supabase client that doesn't need auth
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+
 export default async function BookmarkPage({
   params,
 }: {
   params: { id: string }
 }) {
   const { id } = params
-  const supabase = await createClient()
-
-  // Get current user (server-side)
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  // Check if user is admin
-  let isAdmin = false
-  if (user) {
-    const { data: profile } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    isAdmin = profile?.role === 'admin'
-  }
+  const supabase = getSupabase()
 
   const { data: bookmark, error } = await supabase
     .from('bookmarks')
@@ -47,9 +41,6 @@ export default async function BookmarkPage({
   if (error || !bookmark) {
     notFound()
   }
-
-  // Check if current user is the creator
-  const isCreator = user && bookmark.creator_id === user.id
 
   // Filter to only show active tags
   const tags = bookmark.bookmark_tags
@@ -78,11 +69,11 @@ export default async function BookmarkPage({
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Back link */}
       <Link
-        href="/dashboard"
+        href="/"
         className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Dashboard
+        Back to Home
       </Link>
 
       {/* Archived banner */}
@@ -111,7 +102,7 @@ export default async function BookmarkPage({
             bookmarkId={bookmark.id}
             bookmarkUrl={bookmark.url}
             isArchived={isArchived}
-            isCreator={isCreator || false}
+            creatorId={bookmark.creator_id}
           />
         </div>
 
@@ -178,7 +169,6 @@ export default async function BookmarkPage({
             <div className="flex items-center gap-2">
               <User className="h-4 w-4" />
               {bookmark.users.name || bookmark.users.email?.split('@')[0]}
-              {isCreator && <span className="text-primary-600">(you)</span>}
             </div>
           )}
         </div>
@@ -205,7 +195,6 @@ export default async function BookmarkPage({
         <CommentSection 
           bookmarkId={bookmark.id}
           initialComments={comments}
-          isAdmin={isAdmin}
         />
       )}
     </div>
