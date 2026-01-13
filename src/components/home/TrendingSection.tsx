@@ -1,10 +1,17 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { TrendingUp, Flame } from 'lucide-react'
 import { TrendingBookmarkCard } from './TrendingBookmarkCard'
 
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+
 export async function TrendingSection() {
-  const supabase = await createClient()
+  const supabase = getSupabase()
   
   // Fetch trending bookmarks (most clicks + recent)
   const { data: bookmarks } = await supabase

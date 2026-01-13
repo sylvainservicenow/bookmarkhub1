@@ -1,72 +1,58 @@
+import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
-import { Tag, ChevronRight } from 'lucide-react'
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
 export async function CategoryPills() {
-  const supabase = await createClient()
+  const supabase = getSupabase()
+  
+  // Fetch top tags with bookmark counts
+  const { data: tags } = await supabase
+    .from('tags')
+    .select(`
+      id,
+      name,
+      bookmark_tags(count)
+    `)
+    .eq('status', 'active')
+    .eq('visibility', 'public')
+    .order('name')
+    .limit(15)
 
-  // Fetch tags with their bookmark counts in a more efficient way
-  const { data: bookmarkTags } = await supabase
-    .from('bookmark_tags')
-    .select('tag_id, tags(id, name)')
-
-  if (!bookmarkTags || bookmarkTags.length === 0) {
+  if (!tags || tags.length === 0) {
     return null
   }
 
-  // Count occurrences of each tag
-  const tagCounts: Record<string, { id: string; name: string; count: number }> = {}
-  
-  bookmarkTags.forEach((bt: any) => {
-    if (bt.tags) {
-      const tagId = bt.tags.id
-      if (!tagCounts[tagId]) {
-        tagCounts[tagId] = {
-          id: bt.tags.id,
-          name: bt.tags.name,
-          count: 0
-        }
-      }
-      tagCounts[tagId].count++
-    }
-  })
-
-  // Sort by count and take top 12
-  const tags = Object.values(tagCounts)
+  // Sort by bookmark count
+  const sortedTags = tags
+    .map(tag => ({
+      ...tag,
+      count: (tag.bookmark_tags as any)?.[0]?.count || 0
+    }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 12)
 
-  if (tags.length === 0) {
-    return null
-  }
-
   return (
-    <div className="max-w-7xl mx-auto px-4 py-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-gray-500 mr-1 flex items-center gap-1">
-          <Tag className="h-4 w-4" />
-          Popular:
-        </span>
-        {tags.map((tag) => (
+    <section className="max-w-7xl mx-auto px-4 py-6">
+      <div className="flex flex-wrap gap-2 justify-center">
+        {sortedTags.map((tag) => (
           <Link
             key={tag.id}
-            href={`/browse?tag=${encodeURIComponent(tag.name)}`}
-            className="group inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded-full text-sm text-gray-700 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 transition-all duration-150 hover:shadow-sm active:scale-95"
+            href={`/search?tag=${encodeURIComponent(tag.name)}`}
+            className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full hover:border-primary-400 hover:text-primary-600 transition-colors text-sm font-medium"
           >
             {tag.name}
-            <span className="text-xs text-gray-400 group-hover:text-primary-500 transition-colors">
-              {tag.count}
-            </span>
+            {tag.count > 0 && (
+              <span className="ml-1.5 text-gray-400 text-xs">({tag.count})</span>
+            )}
           </Link>
         ))}
-        <Link
-          href="/tags"
-          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
-        >
-          All tags
-          <ChevronRight className="h-4 w-4" />
-        </Link>
       </div>
-    </div>
+    </section>
   )
 }
