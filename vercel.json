@@ -1,4 +1,8 @@
 {
-  "framework": "nextjs",
-  "installCommand": "npm install --legacy-peer-deps"
+  "crons": [
+    {
+      "path": "/api/cron/health-check",
+      "schedule": "0 20 * * *"
+    }
+  ]
 }
