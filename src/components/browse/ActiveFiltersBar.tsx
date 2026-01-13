@@ -1,17 +1,18 @@
 'use client'
 
 import Link from 'next/link'
-import { X, Search, Tag, Star } from 'lucide-react'
+import { X, Search, Tag, Star, Heart } from 'lucide-react'
 
 interface ActiveFiltersBarProps {
   query?: string
   selectedTags: string[]
   minRating: number
   sort: string
+  showFavoritesOnly?: boolean
 }
 
-export function ActiveFiltersBar({ query, selectedTags, minRating, sort }: ActiveFiltersBarProps) {
-  const hasFilters = query || selectedTags.length > 0 || minRating > 0
+export function ActiveFiltersBar({ query, selectedTags, minRating, sort, showFavoritesOnly }: ActiveFiltersBarProps) {
+  const hasFilters = query || selectedTags.length > 0 || minRating > 0 || showFavoritesOnly
 
   if (!hasFilters) {
     return null
@@ -41,6 +42,10 @@ export function ActiveFiltersBar({ query, selectedTags, minRating, sort }: Activ
       params.set('rating', String(minRating))
     }
     
+    if (removeParam !== 'favorites' && showFavoritesOnly) {
+      params.set('favorites', 'true')
+    }
+    
     const queryString = params.toString()
     return `/browse${queryString ? `?${queryString}` : ''}`
   }
@@ -57,6 +62,17 @@ export function ActiveFiltersBar({ query, selectedTags, minRating, sort }: Activ
         </Link>
       </div>
       <div className="flex flex-wrap gap-2">
+        {showFavoritesOnly && (
+          <Link
+            href={buildClearUrl('favorites')}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-700 rounded-full text-sm hover:bg-red-100 transition-colors group"
+          >
+            <Heart className="h-3 w-3 fill-current" />
+            <span>My Favorites</span>
+            <X className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+          </Link>
+        )}
+        
         {query && (
           <Link
             href={buildClearUrl('q')}

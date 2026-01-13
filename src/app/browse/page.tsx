@@ -17,6 +17,7 @@ export default async function BrowsePage({
     sort?: string
     rating?: string
     page?: string
+    favorites?: string
   }>
 }) {
   const params = await searchParams
@@ -26,6 +27,7 @@ export default async function BrowsePage({
   const sort = params.sort || 'recent'
   const minRating = params.rating ? parseInt(params.rating) : 0
   const currentPage = params.page ? parseInt(params.page) : 1
+  const showFavoritesOnly = params.favorites === 'true'
   
   // Parse multiple tags
   const selectedTags = tagsParam ? tagsParam.split(',').filter(Boolean) : (tag ? [tag] : [])
@@ -88,6 +90,13 @@ export default async function BrowsePage({
   
   let filteredBookmarks = bookmarks || []
   
+  // Filter by favorites
+  if (showFavoritesOnly && userFavorites.length > 0) {
+    filteredBookmarks = filteredBookmarks.filter((b: any) => 
+      userFavorites.includes(b.id)
+    )
+  }
+  
   // Filter by tags
   if (selectedTags.length > 0) {
     filteredBookmarks = filteredBookmarks.filter((b: any) => 
@@ -144,6 +153,9 @@ export default async function BrowsePage({
               minRating={minRating}
               searchParams={params}
               allTags={allTags || []}
+              isLoggedIn={!!user}
+              showFavoritesOnly={showFavoritesOnly}
+              favoritesCount={userFavorites.length}
             />
           </aside>
           
@@ -160,6 +172,7 @@ export default async function BrowsePage({
               currentPage={currentPage}
               totalPages={totalPages}
               searchParams={params}
+              showFavoritesOnly={showFavoritesOnly}
             />
           </main>
         </div>

@@ -16,6 +16,7 @@ interface BookmarkListProps {
   currentPage: number
   totalPages: number
   searchParams: { [key: string]: string | undefined }
+  showFavoritesOnly?: boolean
 }
 
 export function BookmarkList({ 
@@ -28,7 +29,8 @@ export function BookmarkList({
   sort = 'recent',
   currentPage,
   totalPages,
-  searchParams
+  searchParams,
+  showFavoritesOnly = false
 }: BookmarkListProps) {
   
   const buildPageUrl = (page: number) => {
@@ -49,6 +51,7 @@ export function BookmarkList({
         selectedTags={selectedTags}
         minRating={minRating}
         sort={sort}
+        showFavoritesOnly={showFavoritesOnly}
       />
       
       <div className="flex items-center justify-between">

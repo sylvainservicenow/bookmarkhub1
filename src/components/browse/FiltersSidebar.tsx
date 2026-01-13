@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Clock, TrendingUp, Star, MessageSquare, Tag, Check } from 'lucide-react'
+import { Clock, TrendingUp, Star, MessageSquare, Tag, Check, Heart } from 'lucide-react'
 
 interface FiltersSidebarProps {
   currentSort: string
@@ -9,6 +9,9 @@ interface FiltersSidebarProps {
   minRating: number
   searchParams: { [key: string]: string | undefined }
   allTags: { id: string; name: string }[]
+  isLoggedIn: boolean
+  showFavoritesOnly: boolean
+  favoritesCount: number
 }
 
 export function FiltersSidebar({ 
@@ -16,7 +19,10 @@ export function FiltersSidebar({
   selectedTags, 
   minRating,
   searchParams,
-  allTags
+  allTags,
+  isLoggedIn,
+  showFavoritesOnly,
+  favoritesCount
 }: FiltersSidebarProps) {
   const sortOptions = [
     { id: 'recent', label: 'Most Recent', icon: Clock },
@@ -57,6 +63,34 @@ export function FiltersSidebar({
 
   return (
     <div className="space-y-6">
+      {/* My Favorites Filter - Only show if logged in */}
+      {isLoggedIn && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            <Heart className="h-4 w-4" />
+            My Favorites
+          </h3>
+          <Link
+            href={buildUrl({ favorites: showFavoritesOnly ? undefined : 'true' })}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+              showFavoritesOnly
+                ? 'bg-red-50 text-red-700 font-medium'
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+              showFavoritesOnly 
+                ? 'bg-red-500 border-red-500' 
+                : 'border-gray-300'
+            }`}>
+              {showFavoritesOnly && <Check className="h-3 w-3 text-white" />}
+            </div>
+            <span>Show only favorites</span>
+            <span className="ml-auto text-xs text-gray-400">({favoritesCount})</span>
+          </Link>
+        </div>
+      )}
+
       {/* Sort Options */}
       <div className="bg-white border border-gray-200 rounded-lg p-4">
         <h3 className="font-semibold text-gray-900 mb-3">Sort By</h3>
