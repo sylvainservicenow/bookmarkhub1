@@ -1,20 +1,23 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
 import { Heart, ArrowLeft, Loader2 } from 'lucide-react'
 import { BookmarkCard } from '@/components/bookmarks/BookmarkCard'
 
 export default function FavoritesPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
+  
   const [bookmarks, setBookmarks] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [supabase] = useState(() => createClient())
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.id) return
 
     const fetchFavorites = async () => {
       const { data: favorites } = await supabase
@@ -50,7 +53,7 @@ export default function FavoritesPage() {
     }
 
     fetchFavorites()
-  }, [user, supabase])
+  }, [user?.id, supabase])
 
   if (authLoading || loading) {
     return (

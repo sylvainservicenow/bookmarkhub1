@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useAuth } from '@/contexts/AuthContext'
+import { createClient } from '@/lib/supabase/client-with-auth'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, AlertTriangle, Clock, Bug, Zap, Check, RefreshCw, Loader2, Filter, X } from 'lucide-react'
@@ -30,8 +30,12 @@ const ERROR_TYPE_CONFIG = {
 }
 
 export default function AdminErrorsPage() {
-  const { profile, loading: authLoading } = useAuth()
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
+  
   const router = useRouter()
+  const [profile, setProfile] = useState<{ role: string } | null>(null)
   const [errors, setErrors] = useState<ClientError[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'unresolved' | ClientError['error_type']>('unresolved')
@@ -39,10 +43,29 @@ export default function AdminErrorsPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    if (!authLoading && profile?.role !== 'admin') {
+    if (authLoading) return
+    
+    if (!user?.id) {
       router.push('/dashboard')
+      return
     }
-  }, [authLoading, profile, router])
+
+    const checkAdmin = async () => {
+      const { data: profileData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      
+      setProfile(profileData)
+      
+      if (profileData?.role !== 'admin') {
+        router.push('/dashboard')
+      }
+    }
+    
+    checkAdmin()
+  }, [authLoading, user?.id, router])
 
   const fetchErrors = async () => {
     setLoading(true)
@@ -83,7 +106,7 @@ export default function AdminErrorsPage() {
       .update({
         resolved: true,
         resolved_at: new Date().toISOString(),
-        resolved_by: profile?.id,
+        resolved_by: user?.id,
       })
       .eq('id', errorId)
 
@@ -97,12 +120,16 @@ export default function AdminErrorsPage() {
 
   const unresolvedCount = errors.filter(e => !e.resolved).length
 
-  if (authLoading || profile?.role !== 'admin') {
+  if (authLoading || !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       </div>
     )
+  }
+
+  if (profile?.role !== 'admin') {
+    return null
   }
 
   return (

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
 import { 
   Bookmark, ArrowLeft, Plus, Archive, CheckSquare, Square, 
@@ -27,7 +27,10 @@ interface BookmarkType {
 }
 
 export default function MyBookmarksPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
+  
   const [bookmarks, setBookmarks] = useState<BookmarkType[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -41,7 +44,7 @@ export default function MyBookmarksPage() {
   const [supabase] = useState(() => createClient())
 
   const fetchBookmarks = async () => {
-    if (!user) return
+    if (!user?.id) return
 
     const { data, error } = await supabase
       .from('bookmarks')
@@ -59,12 +62,12 @@ export default function MyBookmarksPage() {
   }
 
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user?.id) {
       fetchBookmarks()
     } else if (!authLoading && !user) {
       setLoading(false)
     }
-  }, [user, authLoading, sortField, sortOrder])
+  }, [user?.id, authLoading, sortField, sortOrder])
 
   const { activeBookmarks, archivedBookmarks, pendingBookmarks } = useMemo(() => {
     const active = bookmarks.filter(b => b.status === 'active')
@@ -124,7 +127,6 @@ export default function MyBookmarksPage() {
   }
 
   const handleSingleArchive = async (id: string) => {
-    // Prevent double-clicks and concurrent operations
     if (loadingIds.has(id)) return
     
     setLoadingIds(prev => new Set(prev).add(id))
@@ -136,7 +138,6 @@ export default function MyBookmarksPage() {
         .eq('id', id)
       
       if (!error) {
-        // Optimistic update - update local state immediately
         setBookmarks(prev => prev.map(b => 
           b.id === id ? { ...b, status: 'archived' } : b
         ))
@@ -158,7 +159,6 @@ export default function MyBookmarksPage() {
   }
 
   const handleSingleRestore = async (id: string) => {
-    // Prevent double-clicks and concurrent operations
     if (loadingIds.has(id)) return
     
     setLoadingIds(prev => new Set(prev).add(id))
@@ -170,7 +170,6 @@ export default function MyBookmarksPage() {
         .eq('id', id)
       
       if (!error) {
-        // Optimistic update - update local state immediately
         setBookmarks(prev => prev.map(b => 
           b.id === id ? { ...b, status: 'active' } : b
         ))
