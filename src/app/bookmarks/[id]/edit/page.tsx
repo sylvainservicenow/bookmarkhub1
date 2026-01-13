@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, ArrowLeft, Loader2, Save } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Lock, ArrowLeft, Loader2, Save } from 'lucide-react'
 import Link from 'next/link'
 
 interface TagType {
@@ -138,7 +138,7 @@ export default function EditBookmarkPage() {
 
     const { error: updateError } = await supabase
       .from('bookmarks')
-      .update({ url, title, description: description || null, visibility: isPublic ? 'public' : 'restricted' })
+      .update({ url, title, description: description || null, visibility: isPublic ? 'public' : 'private' })
       .eq('id', bookmarkId)
 
     if (updateError) { setError(updateError.message); setLoading(false); return }
@@ -252,15 +252,23 @@ export default function EditBookmarkPage() {
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2"><Globe className="h-4 w-4" />Visibility</label>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">Visibility</label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex items-center gap-2 cursor-pointer p-3 rounded-lg border-2 transition-colors hover:bg-gray-50" style={{ borderColor: isPublic ? 'rgb(13, 148, 136)' : 'rgb(229, 231, 235)' }}>
                 <input type="radio" checked={isPublic} onChange={() => setIsPublic(true)} disabled={loading} className="text-primary-600 focus:ring-primary-500" />
-                <span className="text-sm text-gray-700">Public</span>
+                <Globe className={`h-4 w-4 ${isPublic ? 'text-primary-600' : 'text-gray-400'}`} />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Public</span>
+                  <p className="text-xs text-gray-500">Everyone can see this bookmark</p>
+                </div>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex items-center gap-2 cursor-pointer p-3 rounded-lg border-2 transition-colors hover:bg-gray-50" style={{ borderColor: !isPublic ? 'rgb(13, 148, 136)' : 'rgb(229, 231, 235)' }}>
                 <input type="radio" checked={!isPublic} onChange={() => setIsPublic(false)} disabled={loading} className="text-primary-600 focus:ring-primary-500" />
-                <span className="text-sm text-gray-700">Restricted</span>
+                <Lock className={`h-4 w-4 ${!isPublic ? 'text-primary-600' : 'text-gray-400'}`} />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Only Me</span>
+                  <p className="text-xs text-gray-500">Only you can see this bookmark</p>
+                </div>
               </label>
             </div>
           </div>
