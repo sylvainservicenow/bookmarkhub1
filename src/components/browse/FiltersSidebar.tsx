@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Clock, TrendingUp, Star, MessageSquare, Tag, Check, Heart } from 'lucide-react'
+import { Clock, TrendingUp, Star, MessageSquare, Tag, Check, Heart, Lock } from 'lucide-react'
 
 interface FiltersSidebarProps {
   currentSort: string
@@ -12,6 +12,8 @@ interface FiltersSidebarProps {
   isLoggedIn: boolean
   showFavoritesOnly: boolean
   favoritesCount: number
+  showPrivateOnly: boolean
+  privateCount: number
 }
 
 export function FiltersSidebar({ 
@@ -22,7 +24,9 @@ export function FiltersSidebar({
   allTags,
   isLoggedIn,
   showFavoritesOnly,
-  favoritesCount
+  favoritesCount,
+  showPrivateOnly,
+  privateCount
 }: FiltersSidebarProps) {
   const sortOptions = [
     { id: 'recent', label: 'Most Recent', icon: Clock },
@@ -63,31 +67,53 @@ export function FiltersSidebar({
 
   return (
     <div className="space-y-6">
-      {/* My Favorites Filter - Only show if logged in */}
+      {/* My Bookmarks Section - Only show if logged in */}
       {isLoggedIn && (
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <Heart className="h-4 w-4" />
-            My Favorites
-          </h3>
-          <Link
-            href={buildUrl({ favorites: showFavoritesOnly ? undefined : 'true' })}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-              showFavoritesOnly
-                ? 'bg-red-50 text-red-700 font-medium'
-                : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-              showFavoritesOnly 
-                ? 'bg-red-500 border-red-500' 
-                : 'border-gray-300'
-            }`}>
-              {showFavoritesOnly && <Check className="h-3 w-3 text-white" />}
-            </div>
-            <span>Show only favorites</span>
-            <span className="ml-auto text-xs text-gray-400">({favoritesCount})</span>
-          </Link>
+          <h3 className="font-semibold text-gray-900 mb-3">My Bookmarks</h3>
+          <div className="space-y-1">
+            {/* Favorites filter */}
+            <Link
+              href={buildUrl({ favorites: showFavoritesOnly ? undefined : 'true', private: undefined })}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                showFavoritesOnly
+                  ? 'bg-red-50 text-red-700 font-medium'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                showFavoritesOnly 
+                  ? 'bg-red-500 border-red-500' 
+                  : 'border-gray-300'
+              }`}>
+                {showFavoritesOnly && <Check className="h-3 w-3 text-white" />}
+              </div>
+              <Heart className="h-4 w-4" />
+              <span>My Favorites</span>
+              <span className="ml-auto text-xs text-gray-400">({favoritesCount})</span>
+            </Link>
+            
+            {/* Private bookmarks filter */}
+            <Link
+              href={buildUrl({ private: showPrivateOnly ? undefined : 'true', favorites: undefined })}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                showPrivateOnly
+                  ? 'bg-gray-700 text-white font-medium'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                showPrivateOnly 
+                  ? 'bg-gray-700 border-gray-700' 
+                  : 'border-gray-300'
+              }`}>
+                {showPrivateOnly && <Check className="h-3 w-3 text-white" />}
+              </div>
+              <Lock className="h-4 w-4" />
+              <span>My Private</span>
+              <span className="ml-auto text-xs text-gray-400">({privateCount})</span>
+            </Link>
+          </div>
         </div>
       )}
 
