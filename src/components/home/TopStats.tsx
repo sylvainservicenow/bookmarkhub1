@@ -1,9 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import { Bookmark, FolderOpen, Tag, TrendingUp, Clock, Star } from 'lucide-react'
 
 export async function TopStats() {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   
   // Fetch top bookmarks (by click count)
   const { data: topBookmarks } = await supabase
