@@ -10,7 +10,7 @@ export function HeroSection() {
         <div className="flex justify-center mb-6">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border border-gray-100">
             <Sparkles className="h-4 w-4 text-primary-500" />
-            <span className="text-sm font-medium text-gray-700">Discover ServiceNow tools and resources</span>
+            <span className="text-sm font-medium text-gray-700">Best ServiceNow resources at your fingertips</span>
           </div>
         </div>
         
