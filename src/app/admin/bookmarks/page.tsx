@@ -1,40 +1,148 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
-import { ArrowLeft, Bookmark, ExternalLink, Pencil } from 'lucide-react'
+import { ArrowLeft, Bookmark, ExternalLink, Pencil, Loader2, Search, Filter } from 'lucide-react'
 import { BookmarkStatusSelect } from '@/components/admin/BookmarkStatusSelect'
 
-export default async function AdminBookmarksPage() {
-  const supabase = await createClient()
+interface BookmarkData {
+  id: string
+  title: string
+  url: string
+  visibility: string
+  status: string
+  failure_count: number
+  last_health_check: string | null
+  created_at: string
+  users: { name: string | null; email: string } | null
+}
+
+const STATUS_FILTERS = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'active', label: 'Active' },
+  { value: 'submitted', label: 'Submitted' },
+  { value: 'checked', label: 'Checked' },
+  { value: 'health_warning_1', label: 'Warning 1' },
+  { value: 'health_warning_2', label: 'Warning 2' },
+  { value: 'health_warning_3', label: 'Warning 3' },
+  { value: 'needs_fixing', label: 'Needs Fixing' },
+  { value: 'hidden', label: 'Hidden' },
+  { value: 'archived', label: 'Archived' },
+]
+
+function AdminBookmarksContent() {
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
   
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    redirect('/login?redirect=/admin/bookmarks')
+  const [profile, setProfile] = useState<{ role: string } | null>(null)
+  const [bookmarks, setBookmarks] = useState<BookmarkData[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [supabase] = useState(() => createClient())
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    // Get initial filter from URL
+    const urlStatus = searchParams.get('status')
+    if (urlStatus) {
+      setStatusFilter(urlStatus)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    if (authLoading) return
+    
+    if (!user?.id) {
+      router.push('/dashboard')
+      return
+    }
+
+    const fetchData = async () => {
+      setLoading(true)
+      
+      // Fetch profile to check role
+      const { data: profileData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      
+      setProfile(profileData)
+      
+      if (profileData?.role !== 'admin') {
+        router.push('/dashboard')
+        return
+      }
+
+      // Build query
+      let query = supabase
+        .from('bookmarks')
+        .select(`
+          id,
+          title,
+          url,
+          visibility,
+          status,
+          failure_count,
+          last_health_check,
+          created_at,
+          users:creator_id (name, email)
+        `)
+        .order('created_at', { ascending: false })
+      
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter)
+      }
+      
+      // Apply search filter
+      if (searchQuery) {
+        query = query.or(`title.ilike.%${searchQuery}%,url.ilike.%${searchQuery}%`)
+      }
+      
+      const { data } = await query.limit(200)
+      setBookmarks(data || [])
+      setLoading(false)
+    }
+
+    fetchData()
+  }, [user?.id, authLoading, statusFilter, searchQuery, supabase, router])
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value)
+    // Update URL without refresh
+    const params = new URLSearchParams(searchParams.toString())
+    if (value === 'all') {
+      params.delete('status')
+    } else {
+      params.set('status', value)
+    }
+    router.push(`/admin/bookmarks?${params.toString()}`, { scroll: false })
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    redirect('/dashboard')
+  if (authLoading || (loading && !bookmarks.length)) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading bookmarks...</span>
+        </div>
+      </div>
+    )
   }
 
-  // Get all bookmarks with creator info
-  const { data: bookmarks } = await supabase
-    .from('bookmarks')
-    .select(`
-      *,
-      users:creator_id (name, email)
-    `)
-    .order('created_at', { ascending: false })
+  if (!user || profile?.role !== 'admin') {
+    return null
+  }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
         <Link
@@ -45,79 +153,4 @@ export default async function AdminBookmarksPage() {
           Back to Admin
         </Link>
         
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary-100 rounded-lg">
-            <Bookmark className="h-6 w-6 text-primary-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Manage Bookmarks</h1>
-            <p className="text-gray-600">{bookmarks?.length || 0} bookmarks</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Bookmarks Table */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Title</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Creator</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Visibility</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Status</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Created</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {bookmarks?.map((b: any) => (
-              <tr key={b.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <Link href={`/bookmark/${b.id}`} className="font-medium text-gray-900 hover:text-primary-600 line-clamp-1">
-                    {b.title}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-gray-600 text-sm">
-                  {b.users?.name || b.users?.email?.split('@')[0] || 'Unknown'}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    b.visibility === 'public' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                  }`}>
-                    {b.visibility}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <BookmarkStatusSelect bookmarkId={b.id} currentStatus={b.status} />
-                </td>
-                <td className="px-4 py-3 text-gray-500 text-sm">
-                  {new Date(b.created_at).toLocaleDateString()}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/admin/bookmarks/${b.id}/edit`}
-                      className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded"
-                      title="Edit bookmark"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Link>
-                    <a
-                      href={b.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded"
-                      title="Open URL"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
+        <div className="flex items-center
