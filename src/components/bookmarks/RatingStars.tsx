@@ -18,51 +18,63 @@ export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingS
   const [hoverRating, setHoverRating] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  // Use server-provided values directly - they are the source of truth
   const [currentAverage, setCurrentAverage] = useState(averageRating)
   const [currentTotal, setCurrentTotal] = useState(totalRatings)
   const [supabase] = useState(() => createClient())
   const mountedRef = useRef(true)
 
-  const fetchUserRating = useCallback(async (userId: string) => {
+  // Fetch fresh ratings data from server
+  const fetchRatingsData = useCallback(async () => {
     if (!mountedRef.current) return
     
     try {
-      const { data, error } = await supabase
+      // Fetch all ratings for this bookmark to get accurate count and average
+      const { data: allRatings, error } = await supabase
         .from('ratings')
-        .select('rating')
+        .select('rating, user_id')
         .eq('bookmark_id', bookmarkId)
-        .eq('user_id', userId)
-        .maybeSingle()
 
       if (error) {
-        console.error('Error fetching user rating:', error)
+        console.error('Error fetching ratings:', error)
+        return
       }
 
-      if (mountedRef.current && data) {
-        setUserRating(data.rating)
+      if (mountedRef.current && allRatings) {
+        // Calculate accurate totals
+        const total = allRatings.length
+        const avg = total > 0 
+          ? allRatings.reduce((sum, r) => sum + r.rating, 0) / total 
+          : 0
+        
+        setCurrentTotal(total)
+        setCurrentAverage(avg)
+        
+        // Find user's rating if logged in
+        if (user?.id) {
+          const userRatingData = allRatings.find(r => r.user_id === user.id)
+          if (userRatingData) {
+            setUserRating(userRatingData.rating)
+          }
+        }
       }
     } catch (err) {
-      console.error('Unexpected error fetching rating:', err)
+      console.error('Unexpected error fetching ratings:', err)
     } finally {
       if (mountedRef.current) {
         setLoading(false)
       }
     }
-  }, [supabase, bookmarkId])
+  }, [supabase, bookmarkId, user?.id])
 
   useEffect(() => {
     mountedRef.current = true
-
-    if (user?.id) {
-      fetchUserRating(user.id)
-    } else {
-      setLoading(false)
-    }
+    fetchRatingsData()
 
     return () => {
       mountedRef.current = false
     }
-  }, [user?.id, fetchUserRating])
+  }, [fetchRatingsData])
 
   const handleRate = async (rating: number) => {
     if (!user?.id) {
@@ -71,9 +83,26 @@ export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingS
     }
 
     setSaving(true)
+    const previousRating = userRating
+    const previousTotal = currentTotal
+    const previousAverage = currentAverage
+
+    // Optimistic update
+    if (previousRating) {
+      // Updating existing rating
+      const newAvg = (previousAverage * previousTotal - previousRating + rating) / previousTotal
+      setCurrentAverage(newAvg)
+    } else {
+      // New rating
+      const newTotal = previousTotal + 1
+      const newAvg = (previousAverage * previousTotal + rating) / newTotal
+      setCurrentTotal(newTotal)
+      setCurrentAverage(newAvg)
+    }
+    setUserRating(rating)
 
     try {
-      if (userRating) {
+      if (previousRating) {
         const { error } = await supabase
           .from('ratings')
           .update({ rating })
@@ -81,9 +110,6 @@ export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingS
           .eq('user_id', user.id)
         
         if (error) throw error
-
-        const newTotal = (currentAverage * currentTotal - userRating + rating) / currentTotal
-        setCurrentAverage(newTotal)
       } else {
         const { error } = await supabase
           .from('ratings')
@@ -94,16 +120,13 @@ export function RatingStars({ bookmarkId, totalRatings, averageRating }: RatingS
           })
         
         if (error) throw error
-
-        const newTotal = currentTotal + 1
-        const newAverage = (currentAverage * currentTotal + rating) / newTotal
-        setCurrentAverage(newAverage)
-        setCurrentTotal(newTotal)
       }
-
-      setUserRating(rating)
     } catch (err) {
       console.error('Rating error:', err)
+      // Rollback on error
+      setUserRating(previousRating)
+      setCurrentTotal(previousTotal)
+      setCurrentAverage(previousAverage)
     } finally {
       setSaving(false)
     }
