@@ -47,28 +47,38 @@ export function Header() {
   const handleSignOut = async () => {
     setShowDropdown(false)
     setSigningOut(true)
+    
+    // Clear all cookies manually first
+    if (typeof document !== 'undefined') {
+      const cookiesToClear = [
+        'next-auth.session-token',
+        'next-auth.csrf-token', 
+        'next-auth.callback-url',
+        '__Secure-next-auth.session-token',
+        '__Secure-next-auth.csrf-token',
+        '__Secure-next-auth.callback-url',
+      ]
+      
+      cookiesToClear.forEach(name => {
+        // Clear with various path/domain combinations
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=${window.location.hostname}`
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.${window.location.hostname}`
+      })
+      
+      // Clear sessionStorage too
+      sessionStorage.clear()
+    }
+    
     try {
-      // First call our custom signout endpoint to clear cookies
-      await fetch('/api/auth/signout', { method: 'POST' })
-      // Then call NextAuth signOut
+      // Call NextAuth signOut
       await signOut({ redirect: false })
-      // Clear any client-side storage
-      if (typeof window !== 'undefined') {
-        sessionStorage.clear()
-        // Delete cookies manually on client side too
-        document.cookie.split(';').forEach(cookie => {
-          const name = cookie.split('=')[0].trim()
-          if (name.includes('next-auth') || name.includes('session')) {
-            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
-          }
-        })
-      }
-      // Force a hard navigation to clear all state
-      window.location.href = '/'
     } catch (error) {
       console.error('Sign out error:', error)
-      window.location.href = '/'
     }
+    
+    // Force hard navigation regardless of signOut result
+    window.location.href = '/login'
   }
 
   return (
