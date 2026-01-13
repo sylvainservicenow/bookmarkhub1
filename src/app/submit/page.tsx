@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Plus, X, Check, Loader2, Sparkles } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Plus, X, Check, Loader2, Sparkles, Globe, Lock } from 'lucide-react'
 import { getFaviconUrl } from '@/lib/utils/favicon'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 
@@ -26,6 +26,7 @@ export default function SubmitPage() {
   const [availableTags, setAvailableTags] = useState<TagType[]>([])
   const [newTagName, setNewTagName] = useState('')
   const [customTags, setCustomTags] = useState<string[]>([])
+  const [isPublic, setIsPublic] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -188,7 +189,7 @@ export default function SubmitPage() {
         url,
         title,
         description: description || null,
-        visibility: 'public',
+        visibility: isPublic ? 'public' : 'private',
         status: 'active',
         creator_id: user.id,
         favicon_url: bookmarkFaviconUrl,
@@ -277,6 +278,7 @@ export default function SubmitPage() {
                 setDescription('')
                 setSelectedTags([])
                 setCustomTags([])
+                setIsPublic(true)
                 setTitleFetched(false)
                 setFaviconUrl(null)
               }}
@@ -387,6 +389,29 @@ export default function SubmitPage() {
               placeholder="Optional: Add a brief description"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none disabled:bg-gray-50 transition-colors"
             />
+          </div>
+
+          {/* Visibility */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">Visibility</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer p-3 rounded-lg border-2 transition-colors hover:bg-gray-50" style={{ borderColor: isPublic ? 'rgb(13, 148, 136)' : 'rgb(229, 231, 235)' }}>
+                <input type="radio" checked={isPublic} onChange={() => setIsPublic(true)} disabled={loading} className="text-primary-600 focus:ring-primary-500" />
+                <Globe className={`h-4 w-4 ${isPublic ? 'text-primary-600' : 'text-gray-400'}`} />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Public</span>
+                  <p className="text-xs text-gray-500">Everyone can see this bookmark</p>
+                </div>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer p-3 rounded-lg border-2 transition-colors hover:bg-gray-50" style={{ borderColor: !isPublic ? 'rgb(13, 148, 136)' : 'rgb(229, 231, 235)' }}>
+                <input type="radio" checked={!isPublic} onChange={() => setIsPublic(false)} disabled={loading} className="text-primary-600 focus:ring-primary-500" />
+                <Lock className={`h-4 w-4 ${!isPublic ? 'text-primary-600' : 'text-gray-400'}`} />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Only Me</span>
+                  <p className="text-xs text-gray-500">Only you can see this bookmark</p>
+                </div>
+              </label>
+            </div>
           </div>
 
           {/* Tags Section */}
