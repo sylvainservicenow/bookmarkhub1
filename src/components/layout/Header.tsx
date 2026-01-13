@@ -48,13 +48,25 @@ export function Header() {
     setShowDropdown(false)
     setSigningOut(true)
     try {
-      // Use redirect: false to handle manually, then redirect
+      // First call our custom signout endpoint to clear cookies
+      await fetch('/api/auth/signout', { method: 'POST' })
+      // Then call NextAuth signOut
       await signOut({ redirect: false })
+      // Clear any client-side storage
+      if (typeof window !== 'undefined') {
+        sessionStorage.clear()
+        // Delete cookies manually on client side too
+        document.cookie.split(';').forEach(cookie => {
+          const name = cookie.split('=')[0].trim()
+          if (name.includes('next-auth') || name.includes('session')) {
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+          }
+        })
+      }
       // Force a hard navigation to clear all state
       window.location.href = '/'
     } catch (error) {
       console.error('Sign out error:', error)
-      // Fallback: force navigation anyway
       window.location.href = '/'
     }
   }
