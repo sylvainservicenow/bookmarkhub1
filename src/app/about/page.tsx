@@ -1,8 +1,15 @@
 import { BookmarkIcon, Users, Star, Globe } from 'lucide-react'
+import type { Metadata } from 'next'
 
-export const metadata = {
-  title: 'About Us - BookmarkHub',
-  description: 'Learn about BookmarkHub and our mission',
+export const metadata: Metadata = {
+  title: 'About BookmarkHub',
+  description: 'BookmarkHub helps ServiceNow professionals discover, organize, and share the best resources - built by the community, for the community. Documentation, tools, scripts, and more.',
+  keywords: ['ServiceNow community', 'ServiceNow resources', 'ServiceNow bookmarks', 'ServiceNow professionals'],
+  openGraph: {
+    title: 'About BookmarkHub | ServiceNow Community Resources',
+    description: 'Built by ServiceNow professionals, for ServiceNow professionals. Discover and share the best resources.',
+    url: 'https://www.mybookmarkhub.com/about',
+  },
 }
 
 export default function AboutPage() {
@@ -12,14 +19,14 @@ export default function AboutPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">About BookmarkHub</h1>
-          <p className="text-xl text-gray-600">Connecting communities through shared knowledge</p>
+          <p className="text-xl text-gray-600">Connecting the ServiceNow community through shared knowledge</p>
         </div>
 
         {/* Mission Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">Our Mission</h2>
           <p className="text-gray-600 leading-relaxed mb-4">
-            BookmarkHub was created with a simple goal: to help professionals discover and share valuable web resources 
+            BookmarkHub was created with a simple goal: to help ServiceNow professionals discover and share valuable web resources 
             within their communities. We believe that the best insights often come from trusted colleagues and peers 
             who have already done the research.
           </p>
@@ -37,7 +44,7 @@ export default function AboutPage() {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Curated Content</h3>
             <p className="text-gray-600">
-              Every bookmark is contributed by community members, ensuring relevant and valuable resources.
+              Every bookmark is contributed by community members, ensuring relevant and valuable ServiceNow resources.
             </p>
           </div>
 
@@ -47,7 +54,7 @@ export default function AboutPage() {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Community Driven</h3>
             <p className="text-gray-600">
-              Groups enable teams and communities to share resources privately or with the wider community.
+              Built by ServiceNow professionals, for ServiceNow professionals. Share resources privately or with the wider community.
             </p>
           </div>
 
@@ -76,12 +83,12 @@ export default function AboutPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 mb-8">
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">The Team</h2>
           <p className="text-gray-600 leading-relaxed mb-4">
-            BookmarkHub is built and maintained by Sylvain Hauser, a technology enthusiast passionate about 
-            building tools that help professionals work more efficiently.
+            BookmarkHub is built and maintained by Sylvain Hauser, a ServiceNow professional passionate about 
+            building tools that help the community work more efficiently.
           </p>
           <p className="text-gray-600 leading-relaxed">
             This project started as a personal tool to organize bookmarks and has grown into a platform 
-            that serves the broader community.
+            that serves the broader ServiceNow community.
           </p>
         </div>
 
@@ -89,7 +96,7 @@ export default function AboutPage() {
         <div className="text-center bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl p-8 text-white">
           <h2 className="text-2xl font-semibold mb-2">Join Our Community</h2>
           <p className="mb-6 text-orange-50">
-            Start discovering and sharing valuable resources today.
+            Start discovering and sharing valuable ServiceNow resources today.
           </p>
           <div className="flex gap-4 justify-center">
             <a 
