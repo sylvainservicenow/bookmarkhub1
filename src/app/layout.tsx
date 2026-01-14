@@ -15,8 +15,39 @@ const dmSans = DM_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'BookmarkHub - Discover & Share the Best Bookmarks',
-  description: 'Find curated bookmarks from teams worldwide. Browse by popularity, explore categories, and save your favorites.',
+  title: {
+    default: 'BookmarkHub - ServiceNow Bookmarks & Resources',
+    template: '%s | BookmarkHub'
+  },
+  description: 'Discover and share the best ServiceNow bookmarks. Curated resources for developers, admins, and architects - documentation, tools, GitHub repos, and community content.',
+  keywords: ['ServiceNow', 'ServiceNow bookmarks', 'ServiceNow resources', 'ServiceNow documentation', 'ServiceNow developer', 'ServiceNow community', 'ServiceNow tools', 'ServiceNow scripts'],
+  authors: [{ name: 'Sylvain Hauser' }],
+  creator: 'Sylvain Hauser',
+  metadataBase: new URL('https://www.mybookmarkhub.com'),
+  openGraph: {
+    title: 'BookmarkHub - ServiceNow Bookmarks & Resources',
+    description: 'Discover and share the best ServiceNow bookmarks. Curated resources for the ServiceNow community.',
+    url: 'https://www.mybookmarkhub.com',
+    siteName: 'BookmarkHub',
+    type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'BookmarkHub - ServiceNow Bookmarks & Resources',
+    description: 'Discover and share the best ServiceNow bookmarks and resources.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
