@@ -41,7 +41,7 @@ export default async function BrowsePage({
   const session = await getServerSession(authOptions)
   const user = session?.user
   
-  // Get user's favorites
+  // Get user's favorites (only IDs, minimal data)
   let userFavorites: string[] = []
   if (user?.id) {
     const { data: favorites } = await supabase
@@ -51,35 +51,67 @@ export default async function BrowsePage({
     userFavorites = favorites?.map(f => f.bookmark_id) || []
   }
   
-  // Get user's private bookmarks count
+  // Get user's private bookmarks count (head: true = no data transfer)
   let privateBookmarksCount = 0
   if (user?.id) {
     const { count } = await supabase
       .from('bookmarks')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('creator_id', user.id)
       .eq('visibility', 'private')
       .eq('status', 'active')
     privateBookmarksCount = count || 0
   }
   
-  // Get all tags for filter
+  // Get all tags for filter (only id and name)
   const { data: allTags } = await supabase
     .from('tags')
     .select('id, name')
     .eq('status', 'active')
     .order('name')
   
-  // Build bookmarks query - show public bookmarks + user's own private bookmarks
+  // Calculate offset for pagination
+  const offset = (currentPage - 1) * ITEMS_PER_PAGE
+  
+  // Build optimized bookmarks query - only fetch needed columns
   let bookmarksQuery = supabase
     .from('bookmarks')
     .select(`
-      *,
+      id,
+      title,
+      url,
+      description,
+      favicon_url,
+      click_count,
+      created_at,
+      visibility,
+      creator_id,
       users!bookmarks_creator_id_fkey(id, name),
-      bookmark_tags(tag_id, tags(id, name)),
+      bookmark_tags!inner(tag_id, tags(id, name)),
       ratings(rating)
-    `)
+    `, { count: 'exact' })
     .eq('status', 'active')
+  
+  // For queries without tag filter, we need left join behavior
+  if (selectedTags.length === 0) {
+    bookmarksQuery = supabase
+      .from('bookmarks')
+      .select(`
+        id,
+        title,
+        url,
+        description,
+        favicon_url,
+        click_count,
+        created_at,
+        visibility,
+        creator_id,
+        users!bookmarks_creator_id_fkey(id, name),
+        bookmark_tags(tag_id, tags(id, name)),
+        ratings(rating)
+      `, { count: 'exact' })
+      .eq('status', 'active')
+  }
   
   // Visibility filter: depends on whether showing private only
   if (showPrivateOnly && user?.id) {
@@ -94,44 +126,41 @@ export default async function BrowsePage({
     bookmarksQuery = bookmarksQuery.eq('visibility', 'public')
   }
   
-  // Text search
+  // Text search - server side
   if (query) {
     bookmarksQuery = bookmarksQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%,url.ilike.%${query}%`)
+  }
+  
+  // Tag filtering - server side via inner join
+  if (selectedTags.length > 0) {
+    // The inner join on bookmark_tags already filters, but we need to match tag names
+    bookmarksQuery = bookmarksQuery.in('bookmark_tags.tags.name', selectedTags)
+  }
+  
+  // Filter by favorites - server side
+  if (showFavoritesOnly && userFavorites.length > 0) {
+    bookmarksQuery = bookmarksQuery.in('id', userFavorites)
   }
   
   // Sorting
   if (sort === 'popular') {
     bookmarksQuery = bookmarksQuery.order('click_count', { ascending: false })
-  } else if (sort === 'discussed') {
+  } else if (sort === 'rated') {
+    // For rated sort, we'll sort client-side after fetching (need aggregation)
     bookmarksQuery = bookmarksQuery.order('created_at', { ascending: false })
   } else {
+    // 'recent' or 'discussed' - both use created_at for now
     bookmarksQuery = bookmarksQuery.order('created_at', { ascending: false })
   }
   
-  // Fetch more to allow for client-side filtering
-  const { data: bookmarks } = await bookmarksQuery.limit(500)
+  // Server-side pagination - only fetch what we need!
+  bookmarksQuery = bookmarksQuery.range(offset, offset + ITEMS_PER_PAGE - 1)
+  
+  const { data: bookmarks, count: totalCount } = await bookmarksQuery
   
   let filteredBookmarks = bookmarks || []
   
-  // Filter by favorites
-  if (showFavoritesOnly && userFavorites.length > 0) {
-    filteredBookmarks = filteredBookmarks.filter((b: any) => 
-      userFavorites.includes(b.id)
-    )
-  }
-  
-  // Filter by tags
-  if (selectedTags.length > 0) {
-    filteredBookmarks = filteredBookmarks.filter((b: any) => 
-      selectedTags.some(selectedTag =>
-        b.bookmark_tags?.some((bt: any) => 
-          bt.tags?.name?.toLowerCase() === selectedTag.toLowerCase()
-        )
-      )
-    )
-  }
-  
-  // Filter by rating
+  // Filter by rating (needs to be done after fetch since it requires aggregation)
   if (minRating > 0) {
     filteredBookmarks = filteredBookmarks.filter((b: any) => {
       const ratings = b.ratings || []
@@ -141,7 +170,7 @@ export default async function BrowsePage({
     })
   }
   
-  // Sort by rating if requested
+  // Sort by rating if requested (after fetch since it requires aggregation)
   if (sort === 'rated') {
     filteredBookmarks = filteredBookmarks.sort((a: any, b: any) => {
       const avgA = a.ratings?.length > 0 
@@ -154,11 +183,9 @@ export default async function BrowsePage({
     })
   }
   
-  // Pagination
-  const totalCount = filteredBookmarks.length
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-  const paginatedBookmarks = filteredBookmarks.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  // Calculate pagination info
+  const finalTotalCount = totalCount || 0
+  const totalPages = Math.ceil(finalTotalCount / ITEMS_PER_PAGE)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -187,9 +214,9 @@ export default async function BrowsePage({
           {/* Main Content - Bookmark List */}
           <main className="lg:col-span-9">
             <BookmarkList
-              bookmarks={paginatedBookmarks}
+              bookmarks={filteredBookmarks}
               userFavorites={userFavorites}
-              totalCount={totalCount}
+              totalCount={finalTotalCount}
               query={query}
               selectedTags={selectedTags}
               minRating={minRating}

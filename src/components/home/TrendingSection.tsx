@@ -6,26 +6,42 @@ import { TrendingBookmarkCard } from './TrendingBookmarkCard'
 export async function TrendingSection() {
   const supabase = createAdminClient()
   
-  // Fetch trending bookmarks (most clicks + recent)
-  const { data: bookmarks } = await supabase
-    .from('bookmarks')
-    .select(`
-      id,
-      title,
-      url,
-      description,
-      favicon_url,
-      click_count,
-      created_at,
-      creator_id,
-      users!bookmarks_creator_id_fkey(name),
-      bookmark_tags(tags(id, name)),
-      ratings(rating)
-    `)
-    .eq('status', 'active')
-    .eq('visibility', 'public')
-    .order('click_count', { ascending: false })
-    .limit(3)
+  // Try to get cached trending bookmarks first (refreshed daily)
+  const { data: cachedTrending } = await supabase
+    .from('homepage_cache')
+    .select('data')
+    .eq('cache_key', 'trending_bookmarks')
+    .single()
+  
+  let bookmarks = null
+  
+  if (cachedTrending?.data) {
+    // Use cached data
+    bookmarks = cachedTrending.data
+  } else {
+    // Fallback: direct query (only if cache doesn't exist)
+    const { data } = await supabase
+      .from('bookmarks')
+      .select(`
+        id,
+        title,
+        url,
+        description,
+        favicon_url,
+        click_count,
+        created_at,
+        creator_id,
+        users!bookmarks_creator_id_fkey(name),
+        bookmark_tags(tags(id, name)),
+        ratings(rating)
+      `)
+      .eq('status', 'active')
+      .eq('visibility', 'public')
+      .order('click_count', { ascending: false })
+      .limit(3)
+    
+    bookmarks = data
+  }
 
   if (!bookmarks || bookmarks.length === 0) {
     return null
@@ -51,9 +67,9 @@ export async function TrendingSection() {
         </Link>
       </div>
       
-      {/* Trending Cards */}
+      {/* Trending Cards - Top 3 */}
       <div className="grid md:grid-cols-3 gap-6">
-        {bookmarks.map((bookmark: any, index: number) => (
+        {bookmarks.slice(0, 3).map((bookmark: any, index: number) => (
           <TrendingBookmarkCard 
             key={bookmark.id} 
             bookmark={bookmark} 

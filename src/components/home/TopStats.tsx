@@ -2,10 +2,13 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import { Bookmark, FolderOpen, Tag, TrendingUp, Clock, Star } from 'lucide-react'
 
+// Cache this component for 60 seconds - homepage stats don't need real-time updates
+export const revalidate = 60
+
 export async function TopStats() {
   const supabase = createAdminClient()
   
-  // Fetch top bookmarks (by click count)
+  // Fetch top bookmarks (by click count) - only needed columns
   const { data: topBookmarks } = await supabase
     .from('bookmarks')
     .select('id, title, click_count')
@@ -14,7 +17,7 @@ export async function TopStats() {
     .order('click_count', { ascending: false })
     .limit(5)
 
-  // Fetch recent bookmarks
+  // Fetch recent bookmarks - only needed columns
   const { data: recentBookmarks } = await supabase
     .from('bookmarks')
     .select('id, title, created_at')
@@ -23,49 +26,61 @@ export async function TopStats() {
     .order('created_at', { ascending: false })
     .limit(5)
 
-  // Fetch best rated bookmarks
-  const { data: allRatings } = await supabase
-    .from('ratings')
-    .select('bookmark_id, rating, bookmarks!inner(id, title, status, visibility)')
-    .eq('bookmarks.status', 'active')
-    .eq('bookmarks.visibility', 'public')
-
-  // Calculate average ratings per bookmark
-  const ratingsByBookmark: Record<string, { id: string; title: string; total: number; count: number }> = {}
-  allRatings?.forEach((r: any) => {
-    const bookmarkId = r.bookmark_id
-    if (!ratingsByBookmark[bookmarkId]) {
-      ratingsByBookmark[bookmarkId] = {
-        id: r.bookmarks.id,
-        title: r.bookmarks.title,
-        total: 0,
-        count: 0
-      }
-    }
-    ratingsByBookmark[bookmarkId].total += r.rating
-    ratingsByBookmark[bookmarkId].count++
-  })
+  // Fetch best rated bookmarks using efficient aggregation
+  // This query gets pre-aggregated ratings instead of fetching ALL ratings
+  const { data: bestRatedData } = await supabase
+    .rpc('get_top_rated_bookmarks', { limit_count: 5 })
+    .select('*')
   
-  const bestRated = Object.values(ratingsByBookmark)
-    .map(b => ({ ...b, avg: b.total / b.count }))
-    .sort((a, b) => b.avg - a.avg)
-    .slice(0, 5)
+  // Fallback if RPC doesn't exist yet - use a more efficient query
+  let bestRated: { id: string; title: string; avg: number; count: number }[] = []
+  
+  if (bestRatedData && bestRatedData.length > 0) {
+    bestRated = bestRatedData
+  } else {
+    // Fallback: fetch only bookmarks that HAVE ratings, with limit
+    // This is still more efficient than fetching ALL ratings
+    const { data: ratedBookmarks } = await supabase
+      .from('bookmarks')
+      .select(`
+        id,
+        title,
+        ratings(rating)
+      `)
+      .eq('status', 'active')
+      .eq('visibility', 'public')
+      .not('ratings', 'is', null)
+      .limit(50)  // Reasonable limit instead of ALL
+    
+    if (ratedBookmarks) {
+      bestRated = ratedBookmarks
+        .filter((b: any) => b.ratings && b.ratings.length > 0)
+        .map((b: any) => ({
+          id: b.id,
+          title: b.title,
+          avg: b.ratings.reduce((sum: number, r: any) => sum + r.rating, 0) / b.ratings.length,
+          count: b.ratings.length
+        }))
+        .sort((a, b) => b.avg - a.avg)
+        .slice(0, 5)
+    }
+  }
 
-  // Fetch total counts
+  // Fetch total counts - head: true means no data transfer, just count
   const { count: totalBookmarks } = await supabase
     .from('bookmarks')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('status', 'active')
     .eq('visibility', 'public')
 
   const { count: totalGroups } = await supabase
     .from('groups')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('status', 'active')
 
   const { count: totalTags } = await supabase
     .from('tags')
-    .select('*', { count: 'exact', head: true })
+    .select('id', { count: 'exact', head: true })
     .eq('status', 'active')
 
   return (
