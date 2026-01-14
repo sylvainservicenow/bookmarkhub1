@@ -7,6 +7,7 @@ import { Footer } from '@/components/layout/Footer'
 import { NavigationProgress } from '@/components/layout/NavigationProgress'
 import { SessionProvider } from '@/components/providers/SessionProvider'
 import { FloatingFeedback } from '@/components/feedback/FloatingFeedback'
+import { JsonLd } from '@/components/seo/JsonLd'
 
 const dmSans = DM_Sans({ 
   subsets: ['latin'],
@@ -23,7 +24,11 @@ export const metadata: Metadata = {
   keywords: ['ServiceNow', 'ServiceNow bookmarks', 'ServiceNow resources', 'ServiceNow documentation', 'ServiceNow developer', 'ServiceNow community', 'ServiceNow tools', 'ServiceNow scripts'],
   authors: [{ name: 'Sylvain Hauser' }],
   creator: 'Sylvain Hauser',
+  publisher: 'BookmarkHub',
   metadataBase: new URL('https://www.mybookmarkhub.com'),
+  alternates: {
+    canonical: 'https://www.mybookmarkhub.com',
+  },
   openGraph: {
     title: 'BookmarkHub - ServiceNow Bookmarks & Resources',
     description: 'Discover and share the best ServiceNow bookmarks. Curated resources for the ServiceNow community.',
@@ -31,11 +36,20 @@ export const metadata: Metadata = {
     siteName: 'BookmarkHub',
     type: 'website',
     locale: 'en_US',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'BookmarkHub - ServiceNow Bookmarks & Resources',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'BookmarkHub - ServiceNow Bookmarks & Resources',
     description: 'Discover and share the best ServiceNow bookmarks and resources.',
+    images: ['/og-image.png'],
   },
   robots: {
     index: true,
@@ -47,6 +61,9 @@ export const metadata: Metadata = {
       'max-image-preview': 'large',
       'max-snippet': -1,
     },
+  },
+  verification: {
+    google: 'your-google-verification-code', // Replace with actual code from Search Console
   },
   icons: {
     icon: [
@@ -64,6 +81,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <JsonLd />
+      </head>
       <body className={`${dmSans.className} antialiased`}>
         <SessionProvider>
           <Suspense fallback={null}>

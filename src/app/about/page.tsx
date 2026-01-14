@@ -5,10 +5,14 @@ export const metadata: Metadata = {
   title: 'About BookmarkHub',
   description: 'BookmarkHub helps ServiceNow professionals discover, organize, and share the best resources - built by the community, for the community. Documentation, tools, scripts, and more.',
   keywords: ['ServiceNow community', 'ServiceNow resources', 'ServiceNow bookmarks', 'ServiceNow professionals'],
+  alternates: {
+    canonical: 'https://www.mybookmarkhub.com/about',
+  },
   openGraph: {
     title: 'About BookmarkHub | ServiceNow Community Resources',
     description: 'Built by ServiceNow professionals, for ServiceNow professionals. Discover and share the best resources.',
     url: 'https://www.mybookmarkhub.com/about',
+    images: ['/og-image.png'],
   },
 }
 
