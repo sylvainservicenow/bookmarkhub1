@@ -1,13 +1,12 @@
 name: E2E Tests
 
 on:
-  # Run daily at 6 AM UTC
+  # Run weekly on Sundays at 6 AM UTC (reduced from daily to save egress)
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '0 6 * * 0'
   
-  # Run on push to main
-  push:
-    branches: [main]
+  # REMOVED: push trigger was causing massive egress from parallel test runs
+  # Tests now only run on schedule or manual trigger
   
   # Allow manual trigger
   workflow_dispatch:
