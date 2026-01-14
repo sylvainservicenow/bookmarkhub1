@@ -4,9 +4,21 @@ import { authOptions } from '@/lib/auth/options'
 import { BrowseHeader } from '@/components/browse/BrowseHeader'
 import { FiltersSidebar } from '@/components/browse/FiltersSidebar'
 import { BookmarkList } from '@/components/browse/BookmarkList'
+import type { Metadata } from 'next'
 
 // Force dynamic rendering to ensure fresh data
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'Browse ServiceNow Bookmarks',
+  description: 'Browse curated ServiceNow bookmarks by category, tag, or rating. Find documentation, tools, scripts, GitHub repos, and community resources for ServiceNow developers and admins.',
+  keywords: ['ServiceNow bookmarks', 'ServiceNow documentation', 'ServiceNow tools', 'ServiceNow scripts', 'ServiceNow developer resources'],
+  openGraph: {
+    title: 'Browse ServiceNow Bookmarks | BookmarkHub',
+    description: 'Discover curated ServiceNow resources - documentation, tools, scripts, and community content.',
+    url: 'https://www.mybookmarkhub.com/browse',
+  },
+}
 
 const ITEMS_PER_PAGE = 25
 
