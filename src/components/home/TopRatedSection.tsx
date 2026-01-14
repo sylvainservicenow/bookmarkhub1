@@ -6,59 +6,53 @@ import { TopRatedBookmarkCard } from './TopRatedBookmarkCard'
 export async function TopRatedSection() {
   const supabase = createAdminClient()
   
-  // Fetch all ratings with bookmark info
-  const { data: allRatings } = await supabase
-    .from('ratings')
-    .select(`
-      bookmark_id,
-      rating,
-      bookmarks!inner(
-        id,
-        title,
-        url,
-        description,
-        favicon_url,
-        status,
-        visibility,
-        creator_id,
-        users!bookmarks_creator_id_fkey(name),
-        bookmark_tags(tags(id, name))
-      )
-    `)
-    .eq('bookmarks.status', 'active')
-    .eq('bookmarks.visibility', 'public')
-
-  // Calculate average ratings per bookmark
-  const ratingsByBookmark: Record<string, {
-    bookmark: any
-    total: number
-    count: number
-  }> = {}
+  // Try to get cached top rated bookmarks first (refreshed daily)
+  const { data: cachedTopRated } = await supabase
+    .from('homepage_cache')
+    .select('data')
+    .eq('cache_key', 'top_rated_bookmarks')
+    .single()
   
-  allRatings?.forEach((r: any) => {
-    const bookmarkId = r.bookmark_id
-    if (!ratingsByBookmark[bookmarkId]) {
-      ratingsByBookmark[bookmarkId] = {
-        bookmark: r.bookmarks,
-        total: 0,
-        count: 0,
-      }
+  let topRated: any[] = []
+  
+  if (cachedTopRated?.data) {
+    // Use cached data
+    topRated = cachedTopRated.data
+  } else {
+    // Fallback: Use the efficient RPC function
+    const { data: rpcData } = await supabase
+      .rpc('get_top_rated_bookmarks', { limit_count: 3 })
+    
+    if (rpcData && rpcData.length > 0) {
+      // Fetch full bookmark details for the top 3
+      const bookmarkIds = rpcData.map((r: any) => r.id)
+      const { data: bookmarks } = await supabase
+        .from('bookmarks')
+        .select(`
+          id,
+          title,
+          url,
+          description,
+          favicon_url,
+          creator_id,
+          users!bookmarks_creator_id_fkey(name),
+          bookmark_tags(tags(id, name))
+        `)
+        .in('id', bookmarkIds)
+      
+      // Merge rating data with bookmark data
+      topRated = rpcData.map((r: any) => {
+        const bookmark = bookmarks?.find((b: any) => b.id === r.id)
+        return {
+          ...bookmark,
+          avgRating: parseFloat(r.avg),
+          ratingCount: parseInt(r.count)
+        }
+      })
     }
-    ratingsByBookmark[bookmarkId].total += r.rating
-    ratingsByBookmark[bookmarkId].count++
-  })
-  
-  // Sort by average rating and get top 6
-  const topRated = Object.values(ratingsByBookmark)
-    .map(item => ({
-      ...item.bookmark,
-      avgRating: item.total / item.count,
-      ratingCount: item.count,
-    }))
-    .sort((a, b) => b.avgRating - a.avgRating)
-    .slice(0, 6)
+  }
 
-  if (topRated.length === 0) {
+  if (!topRated || topRated.length === 0) {
     return null
   }
 
@@ -84,9 +78,9 @@ export async function TopRatedSection() {
         </Link>
       </div>
       
-      {/* Top Rated Cards - 3x2 Grid */}
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {topRated.map((bookmark: any, index: number) => (
+      {/* Top Rated Cards - Top 3 */}
+      <div className="grid md:grid-cols-3 gap-6">
+        {topRated.slice(0, 3).map((bookmark: any, index: number) => (
           <TopRatedBookmarkCard 
             key={bookmark.id} 
             bookmark={bookmark}
