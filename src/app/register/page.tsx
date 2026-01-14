@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { BookmarkIcon, Mail, Loader2, CheckCircle, UserPlus } from 'lucide-react'
+import { BookmarkIcon, Mail, Loader2, CheckCircle, UserPlus, AlertTriangle } from 'lucide-react'
 
 function RegisterForm() {
   const [name, setName] = useState('')
@@ -19,6 +19,9 @@ function RegisterForm() {
   const searchParams = useSearchParams()
   const { status } = useSession()
   const redirect = searchParams.get('redirect') || '/dashboard'
+
+  // Check if email is a ServiceNow corporate email
+  const isServiceNowEmail = email.toLowerCase().endsWith('@servicenow.com')
 
   // If already logged in, redirect
   useEffect(() => {
@@ -99,6 +102,20 @@ function RegisterForm() {
           We've sent a confirmation link to <strong>{email}</strong>.
           Please click the link to activate your account.
         </p>
+        {isServiceNowEmail && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-left">
+            <div className="flex gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-amber-800 font-medium">ServiceNow email detected</p>
+                <p className="text-sm text-amber-700 mt-1">
+                  Due to email filtering, the confirmation email may not arrive. 
+                  The admin has been notified and will manually approve your account shortly.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         <Link 
           href="/login"
           className="text-primary-600 hover:text-primary-700 font-medium"
@@ -147,6 +164,17 @@ function RegisterForm() {
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
           placeholder="you@example.com"
         />
+        {isServiceNowEmail && (
+          <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <div className="flex gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700">
+                <strong>Note:</strong> ServiceNow corporate email may block our confirmation emails. 
+                If you don't receive the email, the admin will be notified and can manually approve your account.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div>
