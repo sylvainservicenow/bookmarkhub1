@@ -2,9 +2,6 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'sylvain.helworksanthropic@gmail.com'
-const FROM_EMAIL = process.env.FROM_EMAIL || 'BookmarkHub <notifications@mybookmarkhub.com>'
-
 interface SendEmailOptions {
   to: string | string[]
   subject: string
@@ -18,9 +15,14 @@ export async function sendEmail({ to, subject, html, text }: SendEmailOptions) {
     return { success: false, error: 'Email service not configured' }
   }
 
+  if (!process.env.FROM_EMAIL) {
+    console.warn('FROM_EMAIL not set, skipping email send')
+    return { success: false, error: 'FROM_EMAIL not configured' }
+  }
+
   try {
     const { data, error } = await resend.emails.send({
-      from: FROM_EMAIL,
+      from: process.env.FROM_EMAIL,
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
@@ -40,8 +42,13 @@ export async function sendEmail({ to, subject, html, text }: SendEmailOptions) {
 }
 
 export async function sendAdminNotification(subject: string, html: string) {
+  if (!process.env.ADMIN_EMAIL) {
+    console.warn('ADMIN_EMAIL not set, skipping admin notification')
+    return { success: false, error: 'ADMIN_EMAIL not configured' }
+  }
+
   return sendEmail({
-    to: ADMIN_EMAIL,
+    to: process.env.ADMIN_EMAIL,
     subject: `[BookmarkHub] ${subject}`,
     html,
   })
@@ -65,9 +72,6 @@ export async function notifyNewFeedback(feedback: {
   }
 
   const topicLabel = topicLabels[feedback.topic] || feedback.topic
-  const preview = feedback.message.length > 100 
-    ? feedback.message.substring(0, 100) + '...' 
-    : feedback.message
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
