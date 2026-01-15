@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 interface UserStatusToggleProps {
@@ -13,12 +12,12 @@ interface UserStatusToggleProps {
 export function UserStatusToggle({ userId, currentStatus, disabled }: UserStatusToggleProps) {
   const [status, setStatus] = useState(currentStatus)
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const supabase = createClient()
 
   const handleChange = async (newStatus: string) => {
     setLoading(true)
-    setStatus(newStatus)
+    const previousStatus = status
+    setStatus(newStatus) // Optimistic update
 
     const { error } = await supabase
       .from('users')
@@ -26,11 +25,10 @@ export function UserStatusToggle({ userId, currentStatus, disabled }: UserStatus
       .eq('id', userId)
 
     if (error) {
-      setStatus(currentStatus)
+      setStatus(previousStatus) // Revert on error
       alert('Failed to update status')
-    } else {
-      router.refresh()
     }
+    // Removed router.refresh() - let the local state handle the UI update
 
     setLoading(false)
   }
