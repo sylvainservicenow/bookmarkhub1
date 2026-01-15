@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
-import { ArrowLeft, Tag } from 'lucide-react'
+import { Tag } from 'lucide-react'
+import { BackButton } from '@/components/navigation/BackButton'
 
 export default async function TagsPage() {
   const supabase = createAdminClient()
@@ -33,13 +34,9 @@ export default async function TagsPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <Link
-        href="/"
-        className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Home
-      </Link>
+      <div className="mb-6">
+        <BackButton fallbackHref="/" label="Back" />
+      </div>
       
       <div className="flex items-center gap-3 mb-8">
         <div className="p-2 bg-amber-100 rounded-lg">
@@ -57,7 +54,7 @@ export default async function TagsPage() {
             {sortedTags.map((tag) => (
               <Link
                 key={tag.id}
-                href={`/search?tag=${encodeURIComponent(tag.name)}`}
+                href={`/browse?tag=${encodeURIComponent(tag.name)}`}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-full hover:bg-primary-100 hover:text-primary-700 transition-colors"
               >
                 <span className="font-medium">{tag.name}</span>
