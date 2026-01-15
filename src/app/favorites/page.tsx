@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
-import { Heart, ArrowLeft, Loader2 } from 'lucide-react'
+import { Heart, Loader2 } from 'lucide-react'
 import { BookmarkCard } from '@/components/bookmarks/BookmarkCard'
+import { BackButton } from '@/components/navigation/BackButton'
 
 export default function FavoritesPage() {
   const { data: session, status } = useSession()
@@ -74,13 +75,9 @@ export default function FavoritesPage() {
     <div className="max-w-6xl mx-auto px-4 py-8 animate-fade-in">
       {/* Header */}
       <div className="mb-8">
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Link>
+        <div className="mb-4">
+          <BackButton fallbackHref="/dashboard" label="Back" />
+        </div>
         
         <div className="flex items-center gap-3">
           <div className="p-2 bg-red-100 rounded-lg">
@@ -107,7 +104,7 @@ export default function FavoritesPage() {
               Start exploring and save bookmarks you like!
             </p>
             <Link
-              href="/search"
+              href="/browse"
               className="inline-flex px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
             >
               Browse Bookmarks
