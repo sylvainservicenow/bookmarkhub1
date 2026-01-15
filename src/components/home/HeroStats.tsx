@@ -1,14 +1,20 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Bookmark, TrendingUp } from 'lucide-react'
 
-// Helper to round to nearest nice number (400+, 1000+, etc)
+// Helper to round to nearest nice number (50+, 100+, 150+, etc)
 function formatApproxCount(count: number): string {
   if (count < 10) return count.toString()
-  if (count < 100) {
+  if (count < 50) {
     const rounded = Math.floor(count / 10) * 10
     return `${rounded}+`
   }
+  if (count < 200) {
+    // Round to nearest 50
+    const rounded = Math.floor(count / 50) * 50
+    return `${rounded}+`
+  }
   if (count < 1000) {
+    // Round to nearest 100
     const rounded = Math.floor(count / 100) * 100
     return `${rounded}+`
   }
