@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { sendAdminNotification } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,30 +40,49 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Error storing contact message:', insertError)
       // If table doesn't exist, we'll just log and continue
-      // The message can be sent via email as backup
     }
 
-    // For now, we'll return success even if DB storage fails
-    // In production, you would also send an email here using a service like:
-    // - Resend (resend.com)
-    // - SendGrid
-    // - AWS SES
-    // - Postmark
-    
-    // Example with Resend (when you add the RESEND_API_KEY env variable):
-    // const resend = new Resend(process.env.RESEND_API_KEY)
-    // await resend.emails.send({
-    //   from: 'BookmarkHub <noreply@bookmarkhub.com>',
-    //   to: ['admin@bookmarkhub.com'],
-    //   subject: `[BookmarkHub Contact] ${subject}`,
-    //   html: `
-    //     <h2>New Contact Form Submission</h2>
-    //     <p><strong>From:</strong> ${name} (${email})</p>
-    //     <p><strong>Subject:</strong> ${subject}</p>
-    //     <p><strong>Message:</strong></p>
-    //     <p>${message.replace(/\n/g, '<br>')}</p>
-    //   `
-    // })
+    // Send email notification to admin (fire and forget)
+    const subjectLabels: Record<string, string> = {
+      general: 'General Inquiry',
+      support: 'Technical Support',
+      feedback: 'Feedback',
+      bug: 'Bug Report',
+      feature: 'Feature Request',
+      other: 'Other',
+    }
+
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #1f2937; border-bottom: 2px solid #f97316; padding-bottom: 10px;">
+          New Contact Form Submission
+        </h2>
+        
+        <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0 0 8px 0;">
+            <strong style="color: #6b7280;">From:</strong> 
+            <span style="color: #1f2937;">${name} (${email})</span>
+          </p>
+          <p style="margin: 0;">
+            <strong style="color: #6b7280;">Subject:</strong> 
+            <span style="color: #1f2937;">${subjectLabels[subject] || subject}</span>
+          </p>
+        </div>
+
+        <div style="background: #fff; border: 1px solid #e5e7eb; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0 0 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase;">Message</p>
+          <p style="margin: 0; color: #1f2937; white-space: pre-wrap;">${message}</p>
+        </div>
+
+        <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; text-align: center;">
+          This is an automated notification from BookmarkHub
+        </p>
+      </div>
+    `
+
+    sendAdminNotification(`Contact: ${subjectLabels[subject] || subject}`, html).catch((err) => {
+      console.error('Failed to send contact notification email:', err)
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {
