@@ -2,10 +2,10 @@
 
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
-import { BookmarkIcon, User as UserIcon, Plus, Loader2, LogOut, Search } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { BookmarkIcon, User as UserIcon, Plus, Loader2, LogOut } from 'lucide-react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client-with-auth'
+import { HeaderSearchBar } from './HeaderSearchBar'
 
 // Avatar mapping - must match settings page
 const AVATAR_MAP: Record<string, string> = {
@@ -21,23 +21,8 @@ export function Header() {
   const [showDropdown, setShowDropdown] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [signingOut, setSigningOut] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
   const loading = status === 'loading'
   const user = session?.user
-  
-  const pathname = usePathname()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  
-  // Check if we're on the homepage
-  const isHomepage = pathname === '/'
-  
-  // Sync search query with URL params when on browse page
-  useEffect(() => {
-    if (pathname === '/browse') {
-      setSearchQuery(searchParams.get('q') || '')
-    }
-  }, [pathname, searchParams])
 
   // Fetch avatar from profile
   useEffect(() => {
@@ -96,15 +81,6 @@ export function Header() {
     // Force hard navigation regardless of signOut result
     window.location.href = '/login'
   }
-  
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    const params = new URLSearchParams()
-    if (searchQuery.trim()) {
-      params.set('q', searchQuery.trim())
-    }
-    router.push(`/browse?${params.toString()}`)
-  }
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -116,30 +92,10 @@ export function Header() {
             <span className="text-xl font-bold text-gray-900 hidden sm:inline">BookmarkHub</span>
           </Link>
           
-          {/* Search Bar - Hidden on homepage */}
-          {!isHomepage && (
-            <form onSubmit={handleSearch} className="flex-1 max-w-xl">
-              <div className="relative flex items-center">
-                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search bookmarks..."
-                  className="w-full pl-10 pr-12 py-2 bg-gray-50 border border-gray-200 rounded-full focus:ring-2 focus:ring-primary-500 focus:border-primary-500 focus:bg-white outline-none transition-all text-sm"
-                />
-                <button
-                  type="submit"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 p-2 bg-primary-500 text-white rounded-full hover:bg-primary-600 transition-colors"
-                  aria-label="Search"
-                >
-                  <Search className="h-4 w-4" />
-                </button>
-              </div>
-            </form>
-          )}
+          {/* Search Bar - Wrapped in Suspense for useSearchParams */}
+          <Suspense fallback={<div className="flex-1 max-w-xl" />}>
+            <HeaderSearchBar />
+          </Suspense>
 
           {/* Right side */}
           <div className="flex items-center gap-3 flex-shrink-0">
