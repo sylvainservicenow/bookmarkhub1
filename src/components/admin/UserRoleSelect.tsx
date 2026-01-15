@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 interface UserRoleSelectProps {
@@ -13,12 +12,12 @@ interface UserRoleSelectProps {
 export function UserRoleSelect({ userId, currentRole, disabled }: UserRoleSelectProps) {
   const [role, setRole] = useState(currentRole)
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const supabase = createClient()
 
   const handleChange = async (newRole: string) => {
     setLoading(true)
-    setRole(newRole)
+    const previousRole = role
+    setRole(newRole) // Optimistic update
 
     const { error } = await supabase
       .from('users')
@@ -26,11 +25,10 @@ export function UserRoleSelect({ userId, currentRole, disabled }: UserRoleSelect
       .eq('id', userId)
 
     if (error) {
-      setRole(currentRole)
+      setRole(previousRole) // Revert on error
       alert('Failed to update role')
-    } else {
-      router.refresh()
     }
+    // Removed router.refresh() - let the local state handle the UI update
 
     setLoading(false)
   }
