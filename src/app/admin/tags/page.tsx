@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
-import { ArrowLeft, Tag, Plus, Clock, Loader2, Trash2, Archive, AlertCircle, X } from 'lucide-react'
-import { TagStatusSelect } from '@/components/admin/TagStatusSelect'
+import { ArrowLeft, Tag, Plus, Clock, Loader2, Trash2, Archive, AlertCircle, X, Edit, Eye } from 'lucide-react'
 import { CreateTagForm } from '@/components/admin/CreateTagForm'
 import { TagRequestsManager } from '@/components/admin/TagRequestsManager'
 
@@ -259,9 +258,12 @@ export default function AdminTagsPage() {
               activeTags.map((tag) => (
                 <tr key={tag.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <span className="font-medium text-gray-900">
+                    <Link 
+                      href={`/admin/tags/${tag.id}`}
+                      className="font-medium text-gray-900 hover:text-primary-600"
+                    >
                       {tag.name}
-                    </span>
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-gray-600 text-sm">
                     {tag.bookmark_count} bookmarks
@@ -274,7 +276,14 @@ export default function AdminTagsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <Link
+                        href={`/admin/tags/${tag.id}`}
+                        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded inline-flex"
+                        title="View/Edit tag"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Link>
                       <button
                         onClick={() => handleArchiveTag(tag)}
                         className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded inline-flex"
@@ -317,9 +326,12 @@ export default function AdminTagsPage() {
               {archivedTags.map((tag) => (
                 <tr key={tag.id} className="hover:bg-gray-50 bg-gray-50/50">
                   <td className="px-4 py-3">
-                    <span className="font-medium text-gray-500">
+                    <Link 
+                      href={`/admin/tags/${tag.id}`}
+                      className="font-medium text-gray-500 hover:text-primary-600"
+                    >
                       {tag.name}
-                    </span>
+                    </Link>
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-sm">
                     {tag.bookmark_count} bookmarks
@@ -330,7 +342,14 @@ export default function AdminTagsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <Link
+                        href={`/admin/tags/${tag.id}`}
+                        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded inline-flex"
+                        title="View/Edit tag"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Link>
                       <button
                         onClick={() => handleArchiveTag(tag)}
                         className="p-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 rounded inline-flex"
