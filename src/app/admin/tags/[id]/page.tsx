@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
@@ -47,12 +47,9 @@ interface LinkedBookmark {
   click_count: number
 }
 
-export default function AdminTagDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id: tagId } = use(params)
+export default function AdminTagDetailPage() {
+  const params = useParams()
+  const tagId = params.id as string
   const { data: session, status } = useSession()
   const user = session?.user
   const authLoading = status === 'loading'
@@ -77,7 +74,7 @@ export default function AdminTagDetailPage({
   const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (authLoading) return
+    if (authLoading || !tagId) return
     
     if (!user?.id) {
       router.push(`/login?redirect=/admin/tags/${tagId}`)
