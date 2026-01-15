@@ -62,9 +62,6 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
-  verification: {
-    google: 'your-google-verification-code', // Replace with actual code from Search Console
-  },
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
