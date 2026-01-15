@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Star, ExternalLink, Heart, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 import { ActiveFiltersBar } from './ActiveFiltersBar'
+import { SearchSuggestions } from './SearchSuggestions'
 
 interface BookmarkListProps {
   bookmarks: any[]
@@ -43,6 +44,8 @@ export function BookmarkList({
     return `/browse${queryString ? `?${queryString}` : ''}`
   }
 
+  const hasResults = bookmarks.length > 0
+
   return (
     <div className="space-y-4">
       {/* Active Filters Bar */}
@@ -62,6 +65,11 @@ export function BookmarkList({
           )}
         </p>
       </div>
+
+      {/* "Did you mean..." suggestions when no results */}
+      {query && (
+        <SearchSuggestions query={query} hasResults={hasResults} />
+      )}
 
       {bookmarks.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
