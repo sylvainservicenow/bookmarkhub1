@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { createClient } from '@supabase/supabase-js'
 import { authOptions } from '@/lib/auth/options'
+import { notifyNewFeedback } from '@/lib/email'
 
 const VALID_TOPICS = ['bug', 'feature', 'improvement', 'content', 'other']
 
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     const supabaseAdmin = getSupabaseAdmin()
 
-    // Get user info for logging
+    // Get user info for logging and notification
     const { data: userData } = await supabaseAdmin
       .from('users')
       .select('name, email')
@@ -97,6 +98,18 @@ export async function POST(request: NextRequest) {
       from: userData?.name || session.user.email,
       page: pageUrl || 'unknown',
       preview: message.trim().substring(0, 50) + (message.trim().length > 50 ? '...' : '')
+    })
+
+    // Send email notification to admin (fire and forget - don't block response)
+    notifyNewFeedback({
+      id: feedback.id,
+      topic,
+      message: message.trim(),
+      pageUrl: pageUrl || undefined,
+      userName: userData?.name || undefined,
+      userEmail: userData?.email || session.user.email || undefined,
+    }).catch((err) => {
+      console.error('Failed to send feedback notification email:', err)
     })
 
     return NextResponse.json({ 
