@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
-import { ArrowLeft, Bookmark, ExternalLink, Pencil, Loader2, Search, Filter } from 'lucide-react'
+import { ArrowLeft, Bookmark, ExternalLink, Pencil, Loader2, Search, Filter, Eye } from 'lucide-react'
 import { BookmarkStatusSelect } from '@/components/admin/BookmarkStatusSelect'
 
 interface BookmarkData {
@@ -17,6 +17,8 @@ interface BookmarkData {
   failure_count: number
   last_health_check: string | null
   created_at: string
+  updated_at: string
+  click_count: number
   users: { name: string | null; email: string } | null
 }
 
@@ -64,8 +66,8 @@ function AdminBookmarksContent() {
 
       let query = supabase
         .from('bookmarks')
-        .select('id, title, url, visibility, status, failure_count, last_health_check, created_at, users:creator_id (name, email)')
-        .order('created_at', { ascending: false })
+        .select('id, title, url, visibility, status, failure_count, last_health_check, created_at, updated_at, click_count, users:creator_id (name, email)')
+        .order('updated_at', { ascending: false })
       
       if (statusFilter !== 'all') query = query.eq('status', statusFilter)
       if (searchQuery) query = query.or(`title.ilike.%${searchQuery}%,url.ilike.%${searchQuery}%`)
@@ -145,13 +147,19 @@ function AdminBookmarksContent() {
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Visibility</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Status</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Health</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Created</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
+                  <div className="flex items-center gap-1">
+                    <Eye className="h-3.5 w-3.5" />
+                    <span>Views</span>
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Updated</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {bookmarks.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">No bookmarks found</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500">No bookmarks found</td></tr>
               ) : bookmarks.map((b) => (
                 <tr key={b.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
@@ -168,7 +176,12 @@ function AdminBookmarksContent() {
                       : b.last_health_check ? <span className="text-xs text-green-600">OK</span>
                       : <span className="text-xs text-gray-400">Not checked</span>}
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-sm">{new Date(b.created_at).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-gray-600 text-sm">
+                    <span className="flex items-center gap-1">
+                      {b.click_count || 0}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-sm">{new Date(b.updated_at).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Link href={`/admin/bookmarks/${b.id}/edit`} className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded" title="Edit"><Pencil className="h-4 w-4" /></Link>
