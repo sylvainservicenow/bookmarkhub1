@@ -1,9 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/options'
-import { BrowseHeader } from '@/components/browse/BrowseHeader'
 import { FiltersSidebar } from '@/components/browse/FiltersSidebar'
 import { BookmarkList } from '@/components/browse/BookmarkList'
+import { ActiveFiltersBar } from '@/components/browse/ActiveFiltersBar'
 import type { Metadata } from 'next'
 
 // Force dynamic rendering to ensure fresh data
@@ -205,9 +205,6 @@ export default async function BrowsePage({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with search */}
-      <BrowseHeader initialQuery={query} />
-      
       {/* Main 2-column layout */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
