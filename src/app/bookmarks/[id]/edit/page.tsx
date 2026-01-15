@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Lock, ArrowLeft, Loader2, Save, Archive, RotateCcw } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Lock, ArrowLeft, Loader2, Save, Archive, RotateCcw, Plus } from 'lucide-react'
 import Link from 'next/link'
+import { RequestTagModal } from '@/components/RequestTagModal'
 
 interface TagType {
   id: string
@@ -33,6 +34,7 @@ export default function EditBookmarkPage() {
   const [notFound, setNotFound] = useState(false)
   const [permissionDenied, setPermissionDenied] = useState(false)
   const [profile, setProfile] = useState<{ role: string } | null>(null)
+  const [showTagRequestModal, setShowTagRequestModal] = useState(false)
   const mountedRef = useRef(true)
   const fetchedRef = useRef(false)
   const router = useRouter()
@@ -276,7 +278,17 @@ export default function EditBookmarkPage() {
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2"><Tag className="h-4 w-4" />Tags</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700"><Tag className="h-4 w-4" />Tags</label>
+              <button
+                type="button"
+                onClick={() => setShowTagRequestModal(true)}
+                className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+              >
+                <Plus className="h-3 w-3" />
+                Request new tag
+              </button>
+            </div>
             <div className="flex flex-wrap gap-2">
               {availableTags.map(tag => (
                 <button key={tag.id} type="button" onClick={() => toggleTag(tag.id)} disabled={loading}
@@ -284,6 +296,9 @@ export default function EditBookmarkPage() {
                   {tag.name}
                 </button>
               ))}
+              {availableTags.length === 0 && (
+                <p className="text-sm text-gray-500">No tags available</p>
+              )}
             </div>
           </div>
 
@@ -348,6 +363,17 @@ export default function EditBookmarkPage() {
           </button>
         </div>
       </div>
+
+      {/* Request Tag Modal */}
+      {user?.id && (
+        <RequestTagModal
+          isOpen={showTagRequestModal}
+          onClose={() => setShowTagRequestModal(false)}
+          bookmarkId={bookmarkId}
+          userId={user.id}
+          existingTags={selectedTags}
+        />
+      )}
     </div>
   )
 }
