@@ -5,11 +5,12 @@ import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
 import { 
-  Bookmark, ArrowLeft, Plus, Archive, CheckSquare, Square, 
+  Bookmark, Plus, Archive, CheckSquare, Square, 
   Loader2, Filter, ArrowUpDown, Clock, Eye, EyeOff, RotateCcw,
   CheckCircle, Globe, Lock
 } from 'lucide-react'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
+import { BackButton } from '@/components/navigation/BackButton'
 
 type SortField = 'created_at' | 'title' | 'url'
 type SortOrder = 'asc' | 'desc'
@@ -218,10 +219,9 @@ export default function MyBookmarksPage() {
       )}
 
       <div className="mb-6">
-        <Link href="/dashboard" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Link>
+        <div className="mb-4">
+          <BackButton fallbackHref="/" label="Back" />
+        </div>
         
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

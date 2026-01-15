@@ -1,11 +1,12 @@
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, User, Globe, Archive, Lock, Eye } from 'lucide-react'
+import { Calendar, User, Globe, Archive, Lock, Eye } from 'lucide-react'
 import { RatingStars } from '@/components/bookmarks/RatingStars'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 import { CommentSection } from '@/components/comments/CommentSection'
 import { BookmarkActions } from '@/components/bookmarks/BookmarkActions'
+import { BackButton } from '@/components/navigation/BackButton'
 
 // Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic'
@@ -85,14 +86,10 @@ export default async function BookmarkPage({
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Back link */}
-      <Link
-        href="/"
-        className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Home
-      </Link>
+      {/* Back link - uses browser history to return to previous page (e.g., search with filters) */}
+      <div className="mb-6">
+        <BackButton fallbackHref="/browse" label="Back" />
+      </div>
 
       {/* Archived banner */}
       {isArchived && (
@@ -145,7 +142,7 @@ export default async function BookmarkPage({
             {tags.map((tag: any) => (
               <Link
                 key={tag.id}
-                href={`/search?tag=${encodeURIComponent(tag.name)}`}
+                href={`/browse?tag=${encodeURIComponent(tag.name)}`}
                 className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full hover:bg-gray-200 transition-colors"
               >
                 {tag.name}
@@ -170,7 +167,7 @@ export default async function BookmarkPage({
         <div className="flex flex-wrap gap-6 mt-6 pt-6 border-t border-gray-200 text-sm text-gray-500">
           {domain && (
             <Link 
-              href={`/search?domain=${encodeURIComponent(domain)}`}
+              href={`/browse?domain=${encodeURIComponent(domain)}`}
               className="flex items-center gap-2 hover:text-primary-600 transition-colors"
             >
               <Globe className="h-4 w-4" />

@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
-import Link from 'next/link'
-import { ArrowLeft, User, Mail, Calendar, Shield, Save, Check, Loader2 } from 'lucide-react'
+import { User, Mail, Calendar, Shield, Save, Check, Loader2 } from 'lucide-react'
+import { BackButton } from '@/components/navigation/BackButton'
 
 // 25 avatar options - fun, inclusive, non-human icons
 const AVATAR_OPTIONS = [
@@ -126,13 +126,9 @@ export default function SettingsPage() {
     <div className="max-w-2xl mx-auto px-4 py-8 animate-fade-in">
       {/* Header */}
       <div className="mb-8">
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Link>
+        <div className="mb-4">
+          <BackButton fallbackHref="/dashboard" label="Back" />
+        </div>
         
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-gray-600">Manage your account and preferences</p>
