@@ -4,14 +4,20 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Plus, X, Check, Loader2, Sparkles, Globe, Lock, Clock } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Plus, X, Check, Loader2, Sparkles, Globe, Lock, Clock, AlertCircle, ExternalLink } from 'lucide-react'
 import { getFaviconUrl } from '@/lib/utils/favicon'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
+import Link from 'next/link'
 
 interface TagType {
   id: string
   name: string
   visibility: string
+}
+
+interface ExistingBookmark {
+  id: string
+  title: string
 }
 
 export default function SubmitPage() {
@@ -35,6 +41,8 @@ export default function SubmitPage() {
   const [titleFetched, setTitleFetched] = useState(false)
   const [faviconUrl, setFaviconUrl] = useState<string | null>(null)
   const [dataLoading, setDataLoading] = useState(true)
+  const [checkingUrl, setCheckingUrl] = useState(false)
+  const [existingBookmark, setExistingBookmark] = useState<ExistingBookmark | null>(null)
   
   const router = useRouter()
   const [supabase] = useState(() => createClient())
@@ -66,6 +74,33 @@ export default function SubmitPage() {
       setFaviconUrl(null)
     }
   }, [url])
+
+  // Check for existing URL
+  const checkExistingUrl = useCallback(async (urlToCheck: string) => {
+    try {
+      new URL(urlToCheck)
+    } catch {
+      setExistingBookmark(null)
+      return false
+    }
+
+    setCheckingUrl(true)
+    setExistingBookmark(null)
+
+    const { data: existing } = await supabase
+      .from('bookmarks')
+      .select('id, title')
+      .eq('url', urlToCheck)
+      .single()
+
+    setCheckingUrl(false)
+
+    if (existing) {
+      setExistingBookmark(existing)
+      return true
+    }
+    return false
+  }, [supabase])
 
   const fetchPageTitle = useCallback(async (urlToFetch: string) => {
     try {
@@ -101,20 +136,24 @@ export default function SubmitPage() {
     }
   }, [title, description])
 
+  // Check URL first, then fetch title if not existing
   useEffect(() => {
     if (!url) {
       setTitleFetched(false)
+      setExistingBookmark(null)
       return
     }
 
-    if (title) return
-
-    const timeoutId = setTimeout(() => {
-      fetchPageTitle(url)
+    const timeoutId = setTimeout(async () => {
+      const exists = await checkExistingUrl(url)
+      // Only fetch title if URL doesn't already exist and we don't have a title
+      if (!exists && !title) {
+        fetchPageTitle(url)
+      }
     }, 800)
 
     return () => clearTimeout(timeoutId)
-  }, [url, fetchPageTitle, title])
+  }, [url, checkExistingUrl, fetchPageTitle, title])
 
   const handleAddCustomTag = () => {
     const trimmedTag = newTagName.trim()
@@ -170,6 +209,7 @@ export default function SubmitPage() {
       return
     }
 
+    // Double-check for existing URL
     const { data: existing } = await supabase
       .from('bookmarks')
       .select('id')
@@ -284,6 +324,7 @@ export default function SubmitPage() {
                 setTitleFetched(false)
                 setFaviconUrl(null)
                 setPendingTagsSubmitted(false)
+                setExistingBookmark(null)
               }}
               className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
             >
@@ -337,14 +378,42 @@ export default function SubmitPage() {
                 required
                 disabled={loading}
                 placeholder="https://example.com/article"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:bg-gray-50 transition-colors"
+                className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none disabled:bg-gray-50 transition-colors ${
+                  existingBookmark ? 'border-amber-300 bg-amber-50' : 'border-gray-300'
+                }`}
               />
             </div>
-            {fetchingTitle && (
+            {checkingUrl && (
+              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Checking URL...
+              </p>
+            )}
+            {fetchingTitle && !existingBookmark && (
               <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 Fetching page info...
               </p>
+            )}
+            {existingBookmark && (
+              <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-amber-700 font-medium">This URL already exists</p>
+                    <p className="text-xs text-amber-600 mt-1">
+                      A bookmark with this URL has already been submitted: <strong>{existingBookmark.title}</strong>
+                    </p>
+                    <Link
+                      href={`/bookmark/${existingBookmark.id}`}
+                      className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium mt-2"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      View existing bookmark
+                    </Link>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
@@ -512,7 +581,7 @@ export default function SubmitPage() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !!existingBookmark}
             className="w-full py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
             {loading ? (

@@ -4,9 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { createClient } from '@/lib/supabase/client-with-auth'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Lock, ArrowLeft, Loader2, Save, Archive, RotateCcw, Plus } from 'lucide-react'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, Lock, ArrowLeft, Loader2, Save, Archive, RotateCcw, Plus, X, Check, Clock } from 'lucide-react'
 import Link from 'next/link'
-import { RequestTagModal } from '@/components/RequestTagModal'
 
 interface TagType {
   id: string
@@ -25,6 +24,8 @@ export default function EditBookmarkPage() {
   const [description, setDescription] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [availableTags, setAvailableTags] = useState<TagType[]>([])
+  const [customTags, setCustomTags] = useState<string[]>([])
+  const [newTagName, setNewTagName] = useState('')
   const [isPublic, setIsPublic] = useState(true)
   const [isArchived, setIsArchived] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,7 +35,7 @@ export default function EditBookmarkPage() {
   const [notFound, setNotFound] = useState(false)
   const [permissionDenied, setPermissionDenied] = useState(false)
   const [profile, setProfile] = useState<{ role: string } | null>(null)
-  const [showTagRequestModal, setShowTagRequestModal] = useState(false)
+  const [pendingTagsSubmitted, setPendingTagsSubmitted] = useState(false)
   const mountedRef = useRef(true)
   const fetchedRef = useRef(false)
   const router = useRouter()
@@ -133,6 +134,43 @@ export default function EditBookmarkPage() {
     fetchedRef.current = false
   }, [bookmarkId])
 
+  const handleAddCustomTag = () => {
+    const trimmedTag = newTagName.trim()
+    if (!trimmedTag) return
+    
+    // Check if tag already exists in available tags
+    const existingTag = availableTags.find(
+      t => t.name.toLowerCase() === trimmedTag.toLowerCase()
+    )
+    if (existingTag) {
+      if (!selectedTags.includes(existingTag.id)) {
+        setSelectedTags(prev => [...prev, existingTag.id])
+      }
+      setNewTagName('')
+      return
+    }
+    
+    // Check if already in custom tags
+    if (customTags.some(t => t.toLowerCase() === trimmedTag.toLowerCase())) {
+      setNewTagName('')
+      return
+    }
+    
+    setCustomTags(prev => [...prev, trimmedTag])
+    setNewTagName('')
+  }
+
+  const handleRemoveCustomTag = (tagToRemove: string) => {
+    setCustomTags(prev => prev.filter(t => t !== tagToRemove))
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleAddCustomTag()
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
@@ -148,9 +186,23 @@ export default function EditBookmarkPage() {
 
     if (updateError) { setError(updateError.message); setLoading(false); return }
 
+    // Update existing tags
     await supabase.from('bookmark_tags').delete().eq('bookmark_id', bookmarkId)
     if (selectedTags.length > 0) {
       await supabase.from('bookmark_tags').insert(selectedTags.map(tagId => ({ bookmark_id: bookmarkId, tag_id: tagId })))
+    }
+
+    // Create tag requests for custom tags (require admin approval)
+    if (customTags.length > 0) {
+      for (const tagName of customTags) {
+        await supabase.from('tag_requests').insert({
+          tag_name: tagName,
+          bookmark_id: bookmarkId,
+          requested_by: user.id,
+          status: 'pending',
+        })
+      }
+      setPendingTagsSubmitted(true)
     }
     
     router.push(`/bookmark/${bookmarkId}`)
@@ -277,28 +329,95 @@ export default function EditBookmarkPage() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none resize-none disabled:bg-gray-50 transition-colors" />
           </div>
 
+          {/* Tags Section */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-700"><Tag className="h-4 w-4" />Tags</label>
-              <button
-                type="button"
-                onClick={() => setShowTagRequestModal(true)}
-                className="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
-              >
-                <Plus className="h-3 w-3" />
-                Request new tag
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {availableTags.map(tag => (
-                <button key={tag.id} type="button" onClick={() => toggleTag(tag.id)} disabled={loading}
-                  className={`px-3 py-1 rounded-full text-sm transition-all ${selectedTags.includes(tag.id) ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} disabled:opacity-50`}>
-                  {tag.name}
-                </button>
-              ))}
-              {availableTags.length === 0 && (
-                <p className="text-sm text-gray-500">No tags available</p>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
+              <Tag className="h-4 w-4" />
+              Tags
+              {(selectedTags.length > 0 || customTags.length > 0) && (
+                <span className="text-primary-600">
+                  ({selectedTags.length + customTags.length} selected)
+                </span>
               )}
+            </label>
+            
+            <div className="mb-4">
+              <p className="text-xs text-gray-500 mb-2">Select from existing tags:</p>
+              <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg max-h-40 overflow-y-auto">
+                {availableTags.length > 0 ? (
+                  availableTags.map(tag => {
+                    const isSelected = selectedTags.includes(tag.id)
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => toggleTag(tag.id)}
+                        disabled={loading}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm transition-colors ${
+                          isSelected
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-white border border-gray-300 text-gray-700 hover:border-primary-400 hover:text-primary-600'
+                        } disabled:opacity-50`}
+                      >
+                        {tag.name}
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </button>
+                    )
+                  })
+                ) : (
+                  <span className="text-gray-400 text-sm">No tags available</span>
+                )}
+              </div>
+            </div>
+
+            {customTags.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs text-amber-600 mb-2 flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  New tags (pending admin approval):
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {customTags.map(tag => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-full text-sm"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCustomTag(tag)}
+                        className="hover:text-amber-900"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Or suggest a new tag:</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  disabled={loading}
+                  placeholder="Type a new tag name..."
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none text-sm disabled:bg-gray-50 transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCustomTag}
+                  disabled={!newTagName.trim() || loading}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">New tags require admin approval before being added</p>
             </div>
           </div>
 
@@ -363,17 +482,6 @@ export default function EditBookmarkPage() {
           </button>
         </div>
       </div>
-
-      {/* Request Tag Modal */}
-      {user?.id && (
-        <RequestTagModal
-          isOpen={showTagRequestModal}
-          onClose={() => setShowTagRequestModal(false)}
-          bookmarkId={bookmarkId}
-          userId={user.id}
-          existingTags={selectedTags}
-        />
-      )}
     </div>
   )
 }
