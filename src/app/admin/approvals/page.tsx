@@ -38,6 +38,11 @@ interface GroupCreationRequest {
 
 interface AddToGroupRequest {
   id: string
+  bookmark_id: string
+  group_id: string
+  requested_by: string
+  status: string
+  created_at: string
   bookmark: { id: string; title: string; url: string } | null
   group: { id: string; name: string } | null
   requester: { id: string; name: string | null; email: string } | null
