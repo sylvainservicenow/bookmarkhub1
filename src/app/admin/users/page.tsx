@@ -1,35 +1,84 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
-import { ArrowLeft, Users, Shield, User, Mail, Calendar } from 'lucide-react'
+import { ArrowLeft, Users, User, Loader2 } from 'lucide-react'
 import { UserRoleSelect } from '@/components/admin/UserRoleSelect'
 import { UserStatusToggle } from '@/components/admin/UserStatusToggle'
 
-export default async function AdminUsersPage() {
-  const supabase = await createClient()
+interface UserData {
+  id: string
+  name: string | null
+  email: string
+  role: string
+  status: string
+  created_at: string
+}
+
+export default function AdminUsersPage() {
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
   
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    redirect('/login?redirect=/admin/users')
+  const [profile, setProfile] = useState<{ role: string } | null>(null)
+  const [users, setUsers] = useState<UserData[]>([])
+  const [loading, setLoading] = useState(true)
+  const [supabase] = useState(() => createClient())
+  const router = useRouter()
+
+  useEffect(() => {
+    if (authLoading) return
+    
+    if (!user?.id) {
+      router.push('/login?redirect=/admin/users')
+      return
+    }
+
+    const fetchData = async () => {
+      // Fetch profile to check role
+      const { data: profileData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      
+      setProfile(profileData)
+      
+      if (profileData?.role !== 'admin') {
+        router.push('/dashboard')
+        return
+      }
+
+      // Get all users
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      setUsers(usersData || [])
+      setLoading(false)
+    }
+
+    fetchData()
+  }, [user?.id, authLoading, router, supabase])
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading users...</span>
+        </div>
+      </div>
+    )
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    redirect('/dashboard')
+  if (!user || profile?.role !== 'admin') {
+    return null
   }
-
-  // Get all users
-  const { data: users } = await supabase
-    .from('users')
-    .select('*')
-    .order('created_at', { ascending: false })
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -49,7 +98,7 @@ export default async function AdminUsersPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Manage Users</h1>
-            <p className="text-gray-600">{users?.length || 0} users</p>
+            <p className="text-gray-600">{users.length} users</p>
           </div>
         </div>
       </div>
@@ -67,7 +116,7 @@ export default async function AdminUsersPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {users?.map((u: any) => (
+            {users.map((u) => (
               <tr key={u.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
