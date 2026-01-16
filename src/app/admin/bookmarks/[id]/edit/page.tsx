@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, ArrowLeft, Lock, FolderOpen, Check } from 'lucide-react'
+import { useRouter, useParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
+import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Globe, ArrowLeft, Lock, FolderOpen, Check, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
 interface TagType {
@@ -16,12 +17,14 @@ interface GroupType {
   name: string
 }
 
-export default function AdminEditBookmarkPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const [bookmarkId, setBookmarkId] = useState<string>('')
+export default function AdminEditBookmarkPage() {
+  const params = useParams()
+  const bookmarkId = params.id as string
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
+
+  const [profile, setProfile] = useState<{ role: string } | null>(null)
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -30,33 +33,33 @@ export default function AdminEditBookmarkPage({
   const [visibility, setVisibility] = useState<'public' | 'restricted'>('public')
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
   const [allGroups, setAllGroups] = useState<GroupType[]>([])
-  const [status, setStatus] = useState('active')
+  const [bookmarkStatus, setBookmarkStatus] = useState('active')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   
   const router = useRouter()
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
 
   useEffect(() => {
-    const init = async () => {
-      const { id } = await params
-      setBookmarkId(id)
-      
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
+    if (authLoading || !bookmarkId) return
+    
+    if (!user?.id) {
+      router.push('/login')
+      return
+    }
 
+    const init = async () => {
       // Check if admin
-      const { data: profile } = await supabase
+      const { data: profileData } = await supabase
         .from('users')
         .select('role')
         .eq('id', user.id)
         .single()
 
-      if (profile?.role !== 'admin') {
+      setProfile(profileData)
+
+      if (profileData?.role !== 'admin') {
         router.push('/dashboard')
         return
       }
@@ -69,7 +72,7 @@ export default function AdminEditBookmarkPage({
           bookmark_tags (tag_id),
           bookmark_groups (group_id)
         `)
-        .eq('id', id)
+        .eq('id', bookmarkId)
         .single()
 
       if (bookmarkError || !bookmark) {
@@ -81,7 +84,7 @@ export default function AdminEditBookmarkPage({
       setTitle(bookmark.title)
       setDescription(bookmark.description || '')
       setVisibility(bookmark.visibility)
-      setStatus(bookmark.status)
+      setBookmarkStatus(bookmark.status)
       setSelectedTags(bookmark.bookmark_tags?.map((bt: any) => bt.tag_id) || [])
       setSelectedGroupId(bookmark.bookmark_groups?.[0]?.group_id || null)
 
@@ -107,7 +110,7 @@ export default function AdminEditBookmarkPage({
     }
 
     init()
-  }, [params, supabase, router])
+  }, [bookmarkId, user?.id, authLoading, supabase, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -138,7 +141,7 @@ export default function AdminEditBookmarkPage({
         title,
         description: description || null,
         visibility,
-        status,
+        status: bookmarkStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('id', bookmarkId)
@@ -187,12 +190,19 @@ export default function AdminEditBookmarkPage({
     )
   }
 
-  if (initialLoading) {
+  if (authLoading || initialLoading) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading...</span>
+        </div>
       </div>
     )
+  }
+
+  if (!user || profile?.role !== 'admin') {
+    return null
   }
 
   return (
@@ -293,8 +303,8 @@ export default function AdminEditBookmarkPage({
           <div>
             <label className="text-sm font-medium text-gray-700 mb-2 block">Status</label>
             <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              value={bookmarkStatus}
+              onChange={(e) => setBookmarkStatus(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
             >
               <option value="active">Active</option>
