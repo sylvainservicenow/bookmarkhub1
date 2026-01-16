@@ -1,68 +1,151 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
-import { ArrowLeft, CheckSquare, Users, FolderPlus, FileText } from 'lucide-react'
+import { ArrowLeft, CheckSquare, Users, FolderPlus, FileText, Loader2 } from 'lucide-react'
 import { ApprovalActions } from '@/components/admin/ApprovalActions'
 import { AddToGroupApprovals } from '@/components/admin/AddToGroupApprovals'
 
-export default async function ApprovalsPage() {
-  const supabase = await createClient()
+interface Submission {
+  id: string
+  url: string
+  suggested_title: string | null
+  justification: string | null
+  submitter_email: string
+  submitter: { name: string | null; email: string } | null
+}
+
+interface MembershipRequest {
+  id: string
+  secret_code_used: string | null
+  justification: string | null
+  user_id: string
+  group_id: string
+  user: { name: string | null; email: string } | null
+  group: { name: string } | null
+}
+
+interface GroupCreationRequest {
+  id: string
+  name: string
+  description: string | null
+  visibility: string
+  requester: { name: string | null; email: string } | null
+}
+
+interface AddToGroupRequest {
+  id: string
+  bookmark: { id: string; title: string; url: string } | null
+  group: { id: string; name: string } | null
+  requester: { id: string; name: string | null; email: string } | null
+}
+
+export default function ApprovalsPage() {
+  const { data: session, status } = useSession()
+  const user = session?.user
+  const authLoading = status === 'loading'
   
-  const { data: { user } } = await supabase.auth.getUser()
-  
-  if (!user) {
-    redirect('/login?redirect=/admin/approvals')
+  const [profile, setProfile] = useState<{ role: string } | null>(null)
+  const [pendingSubmissions, setPendingSubmissions] = useState<Submission[]>([])
+  const [pendingMembershipRequests, setPendingMembershipRequests] = useState<MembershipRequest[]>([])
+  const [pendingGroupCreationRequests, setPendingGroupCreationRequests] = useState<GroupCreationRequest[]>([])
+  const [pendingAddToGroupRequests, setPendingAddToGroupRequests] = useState<AddToGroupRequest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [supabase] = useState(() => createClient())
+  const router = useRouter()
+
+  useEffect(() => {
+    if (authLoading) return
+    
+    if (!user?.id) {
+      router.push('/login?redirect=/admin/approvals')
+      return
+    }
+
+    const fetchData = async () => {
+      // Check if user is admin
+      const { data: profileData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      setProfile(profileData)
+
+      if (profileData?.role !== 'admin') {
+        router.push('/dashboard')
+        return
+      }
+
+      // Get pending bookmark submissions
+      const { data: submissions } = await supabase
+        .from('submissions')
+        .select('*, submitter:submitter_user_id(name, email)')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+
+      setPendingSubmissions(submissions || [])
+
+      // Get pending group membership requests
+      const { data: membershipRequests } = await supabase
+        .from('group_requests')
+        .select('*, user:user_id(name, email), group:group_id(name)')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+
+      setPendingMembershipRequests(membershipRequests || [])
+
+      // Get pending group creation requests
+      const { data: groupCreationRequests } = await supabase
+        .from('group_creation_requests')
+        .select('*, requester:requester_id(name, email)')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+
+      setPendingGroupCreationRequests(groupCreationRequests || [])
+
+      // Get pending add-to-group requests
+      const { data: addToGroupRequests } = await supabase
+        .from('add_to_group_requests')
+        .select(`
+          *,
+          bookmark:bookmark_id(id, title, url),
+          group:group_id(id, name),
+          requester:requested_by(id, name, email)
+        `)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+
+      setPendingAddToGroupRequests(addToGroupRequests || [])
+      setLoading(false)
+    }
+
+    fetchData()
+  }, [user?.id, authLoading, router, supabase])
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center">
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Loading approvals...</span>
+        </div>
+      </div>
+    )
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    redirect('/dashboard')
+  if (!user || profile?.role !== 'admin') {
+    return null
   }
-
-  // Get pending bookmark submissions
-  const { data: pendingSubmissions } = await supabase
-    .from('submissions')
-    .select('*, submitter:submitter_user_id(name, email)')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false })
-
-  // Get pending group membership requests
-  const { data: pendingMembershipRequests } = await supabase
-    .from('group_requests')
-    .select('*, user:user_id(name, email), group:group_id(name)')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false })
-
-  // Get pending group creation requests
-  const { data: pendingGroupCreationRequests } = await supabase
-    .from('group_creation_requests')
-    .select('*, requester:requester_id(name, email)')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false })
-
-  // Get pending add-to-group requests
-  const { data: pendingAddToGroupRequests } = await supabase
-    .from('add_to_group_requests')
-    .select(`
-      *,
-      bookmark:bookmark_id(id, title, url),
-      group:group_id(id, name),
-      requester:requested_by(id, name, email)
-    `)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false })
 
   const totalPending = 
-    (pendingSubmissions?.length || 0) + 
-    (pendingMembershipRequests?.length || 0) + 
-    (pendingGroupCreationRequests?.length || 0) +
-    (pendingAddToGroupRequests?.length || 0)
+    pendingSubmissions.length + 
+    pendingMembershipRequests.length + 
+    pendingGroupCreationRequests.length +
+    pendingAddToGroupRequests.length
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -95,14 +178,14 @@ export default async function ApprovalsPage() {
       ) : (
         <div className="space-y-8">
           {/* Bookmark Submissions */}
-          {(pendingSubmissions?.length || 0) > 0 && (
+          {pendingSubmissions.length > 0 && (
             <section>
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <FileText className="h-5 w-5 text-blue-500" />
-                Bookmark Submissions ({pendingSubmissions?.length})
+                Bookmark Submissions ({pendingSubmissions.length})
               </h2>
               <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-200">
-                {pendingSubmissions?.map((submission: any) => (
+                {pendingSubmissions.map((submission) => (
                   <div key={submission.id} className="p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
@@ -122,7 +205,7 @@ export default async function ApprovalsPage() {
                         </p>
                         {submission.justification && (
                           <p className="text-sm text-gray-600 mt-2 bg-gray-50 p-2 rounded">
-                            "{submission.justification}"
+                            &quot;{submission.justification}&quot;
                           </p>
                         )}
                       </div>
@@ -135,14 +218,14 @@ export default async function ApprovalsPage() {
           )}
 
           {/* Group Membership Requests */}
-          {(pendingMembershipRequests?.length || 0) > 0 && (
+          {pendingMembershipRequests.length > 0 && (
             <section>
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Users className="h-5 w-5 text-green-500" />
-                Group Membership Requests ({pendingMembershipRequests?.length})
+                Group Membership Requests ({pendingMembershipRequests.length})
               </h2>
               <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-200">
-                {pendingMembershipRequests?.map((request: any) => (
+                {pendingMembershipRequests.map((request) => (
                   <div key={request.id} className="p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
@@ -158,7 +241,7 @@ export default async function ApprovalsPage() {
                         )}
                         {request.justification && (
                           <p className="text-sm text-gray-600 mt-2 bg-gray-50 p-2 rounded">
-                            "{request.justification}"
+                            &quot;{request.justification}&quot;
                           </p>
                         )}
                       </div>
@@ -171,14 +254,14 @@ export default async function ApprovalsPage() {
           )}
 
           {/* Group Creation Requests */}
-          {(pendingGroupCreationRequests?.length || 0) > 0 && (
+          {pendingGroupCreationRequests.length > 0 && (
             <section>
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <FolderPlus className="h-5 w-5 text-purple-500" />
-                Group Creation Requests ({pendingGroupCreationRequests?.length})
+                Group Creation Requests ({pendingGroupCreationRequests.length})
               </h2>
               <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-200">
-                {pendingGroupCreationRequests?.map((request: any) => (
+                {pendingGroupCreationRequests.map((request) => (
                   <div key={request.id} className="p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
@@ -202,7 +285,7 @@ export default async function ApprovalsPage() {
           )}
 
           {/* Add to Group Requests */}
-          <AddToGroupApprovals requests={pendingAddToGroupRequests || []} />
+          <AddToGroupApprovals requests={pendingAddToGroupRequests} />
         </div>
       )}
     </div>
