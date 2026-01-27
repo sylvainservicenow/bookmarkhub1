@@ -210,7 +210,8 @@ export default async function BrowsePage({
         .select('bookmark_id, tags!inner(name)')
         .in('tags.name', selectedTags)
       
-      const bookmarkIds = [...new Set(taggedBookmarks?.map(t => t.bookmark_id) || [])]
+      // Use Array.from instead of spread on Set for TypeScript compatibility
+      const bookmarkIds = Array.from(new Set(taggedBookmarks?.map(t => t.bookmark_id) || []))
       if (bookmarkIds.length > 0) {
         bookmarksQuery = bookmarksQuery.in('id', bookmarkIds)
       } else {
