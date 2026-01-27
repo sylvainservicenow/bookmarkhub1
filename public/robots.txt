@@ -1,11 +1,17 @@
 # BookmarkHub - Robots.txt
-# Block aggressive crawlers that inflate Vercel costs
+# CRITICAL: Prevent parameter explosion from killing Vercel costs
 
 User-agent: *
 Allow: /
-Allow: /browse
+Allow: /browse$
 Allow: /tags
 Allow: /bookmark/
+Allow: /about
+Allow: /help
+
+# BLOCK all browse with query parameters - this was causing 32K requests/30min!
+Disallow: /browse?
+Disallow: /browse?*
 
 # Disallow authenticated/admin routes
 Disallow: /dashboard
@@ -15,8 +21,10 @@ Disallow: /bookmarks
 Disallow: /favorites
 Disallow: /submit
 Disallow: /api/
+Disallow: /login
+Disallow: /register
 
-# Block aggressive SEO bots
+# Block aggressive SEO bots completely
 User-agent: AhrefsBot
 Disallow: /
 
@@ -53,7 +61,26 @@ Disallow: /
 User-agent: ClaudeBot
 Disallow: /
 
-# Crawl delay for others (not all bots respect this)
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: meta-externalagent
+Disallow: /
+
+# Google bots - allow main content, block parameter variations
+User-agent: Googlebot
+Allow: /$
+Allow: /browse$
+Allow: /tags$
+Allow: /bookmark/
+Disallow: /browse?
+Disallow: /*?
+Crawl-delay: 10
+
+User-agent: GoogleOther
+Disallow: /
+
+# Crawl delay for others
 User-agent: *
 Crawl-delay: 10
 
