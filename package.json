@@ -15,6 +15,7 @@
     "test:report": "playwright show-report"
   },
   "dependencies": {
+    "@next/third-parties": "^14.2.35",
     "@supabase/supabase-js": "^2.47.0",
     "@supabase/ssr": "^0.5.0",
     "next": "14.2.35",

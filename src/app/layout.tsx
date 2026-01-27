@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { DM_Sans } from 'next/font/google'
 import { Suspense } from 'react'
+import { GoogleAnalytics } from '@next/third-parties/google'
 import './globals.css'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
@@ -96,6 +97,7 @@ export default function RootLayout({
           <FloatingFeedback />
         </SessionProvider>
       </body>
+      <GoogleAnalytics gaId="G-H9W8XR8WC2" />
     </html>
   )
 }
