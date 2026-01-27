@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { BookmarkIcon, Mail, Loader2, CheckCircle, UserPlus, AlertTriangle } from 'lucide-react'
+import { analytics } from '@/lib/analytics'
 
 function RegisterForm() {
   const [name, setName] = useState('')
@@ -62,6 +63,9 @@ function RegisterForm() {
         setLoading(false)
         return
       }
+
+      // Track successful registration in GA4
+      analytics.signUp('email')
 
       setSuccess(true)
     } catch (err) {

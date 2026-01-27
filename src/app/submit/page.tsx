@@ -8,6 +8,7 @@ import { BookmarkIcon, Link as LinkIcon, FileText, Tag, Plus, X, Check, Loader2,
 import { getFaviconUrl } from '@/lib/utils/favicon'
 import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 import Link from 'next/link'
+import { analytics } from '@/lib/analytics'
 
 interface TagType {
   id: string
@@ -265,6 +266,10 @@ export default function SubmitPage() {
       }
       setPendingTagsSubmitted(true)
     }
+
+    // Track bookmark submission in GA4
+    const totalTags = selectedTags.length + customTags.length
+    analytics.bookmarkSubmit(isPublic ? 'public' : 'private', totalTags)
 
     setSuccess(true)
     setLoading(false)
