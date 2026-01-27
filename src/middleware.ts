@@ -3,14 +3,17 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 /**
- * Enhanced middleware that combines:
- * 1. NextAuth authentication protection
- * 2. Bot blocking (saves edge requests)
- * 3. Cache headers for public pages (saves function invocations)
+ * COST-OPTIMIZED MIDDLEWARE
+ * 
+ * Key optimizations:
+ * 1. Block known expensive bots FIRST (before any processing)
+ * 2. Return cached responses for public pages
+ * 3. Only check auth for protected routes
  */
 
-// Bots that inflate your Vercel costs without adding value
-const BLOCKED_USER_AGENTS = [
+// Bots that inflate Vercel costs without adding value
+// These get blocked with a 403 before hitting any functions
+const BLOCKED_BOTS = [
   'AhrefsBot',
   'SemrushBot', 
   'DotBot',
@@ -19,49 +22,73 @@ const BLOCKED_USER_AGENTS = [
   'DataForSeoBot',
   'PetalBot',
   'Bytespider',
+  'GPTBot',
+  'CCBot',
+  'anthropic-ai',
+  'ClaudeBot',
+  'Amazonbot',
+  'FacebookBot',
+  'meta-externalagent',
+  'Applebot-Extended',
+  'img2dataset',
+  'Scrapy',
+  'Python-urllib',
+  'Python-requests',
+  'curl/',
+  'wget/',
+  'Go-http-client',
+  'Java/',
 ]
+
+// Check if request is from a blocked bot
+function isBlockedBot(userAgent: string | null): boolean {
+  if (!userAgent) return false
+  return BLOCKED_BOTS.some(bot => userAgent.includes(bot))
+}
+
+// Public paths that can be cached aggressively
+const CACHEABLE_PATHS = ['/', '/browse', '/tags', '/about', '/privacy', '/help', '/pricing', '/contact']
+const CACHEABLE_PREFIXES = ['/bookmark/']
+
+function isCacheablePath(pathname: string): boolean {
+  if (CACHEABLE_PATHS.includes(pathname)) return true
+  return CACHEABLE_PREFIXES.some(prefix => pathname.startsWith(prefix))
+}
 
 export default withAuth(
   function middleware(req) {
     const userAgent = req.headers.get('user-agent') || ''
     const { pathname } = req.nextUrl
     
-    // Block known SEO bots that don't help your ServiceNow community
-    // This alone can reduce edge requests by 10-20%
-    for (const bot of BLOCKED_USER_AGENTS) {
-      if (userAgent.includes(bot)) {
-        // Return a simple 403 - costs almost nothing
-        return new NextResponse('Forbidden', { status: 403 })
-      }
+    // FIRST: Block expensive bots immediately
+    // This is the most important cost optimization
+    if (isBlockedBot(userAgent)) {
+      return new NextResponse('Forbidden', { 
+        status: 403,
+        headers: {
+          'Cache-Control': 'public, max-age=86400', // Cache the 403 for 24h
+        }
+      })
     }
     
     const response = NextResponse.next()
     
-    // Add cache headers for public pages (non-authenticated users)
-    // This reduces Vercel Function invocations dramatically
+    // Add cache headers for public/anonymous requests
     const hasSession = req.cookies.has('next-auth.session-token') || 
                        req.cookies.has('__Secure-next-auth.session-token')
     
-    if (!hasSession) {
-      // Public homepage - cache for 5 minutes
+    if (!hasSession && isCacheablePath(pathname)) {
+      // Aggressive caching for anonymous users
       if (pathname === '/') {
-        response.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600')
-      }
-      // Browse page - cache for 2 minutes (changes more often)
-      else if (pathname === '/browse') {
-        response.headers.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300')
-      }
-      // Individual bookmark pages - cache for 10 minutes
-      else if (pathname.startsWith('/bookmark/')) {
         response.headers.set('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=1200')
-      }
-      // Static content pages
-      else if (['/about', '/privacy', '/help', '/pricing', '/contact'].includes(pathname)) {
-        response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=7200')
-      }
-      // Tags page
-      else if (pathname.startsWith('/tags')) {
+      } else if (pathname === '/browse') {
         response.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600')
+      } else if (pathname.startsWith('/bookmark/')) {
+        response.headers.set('Cache-Control', 'public, s-maxage=1800, stale-while-revalidate=3600')
+      } else if (pathname === '/tags') {
+        response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=7200')
+      } else {
+        response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=7200')
       }
     }
     
@@ -70,7 +97,6 @@ export default withAuth(
   {
     callbacks: {
       authorized: ({ token, req }) => {
-        // Protected routes that require authentication
         const protectedPaths = [
           '/dashboard',
           '/submit',
@@ -83,12 +109,10 @@ export default withAuth(
         const path = req.nextUrl.pathname
         const isProtectedPath = protectedPaths.some(p => path.startsWith(p))
         
-        // If it's a protected path, require a token
         if (isProtectedPath) {
           return !!token
         }
         
-        // Allow all other paths
         return true
       },
     },
@@ -100,14 +124,7 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (images, etc.)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Match all paths except static files
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2)$).*)',
   ],
 }
