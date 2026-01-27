@@ -2,35 +2,50 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import { Tag } from 'lucide-react'
 import { BackButton } from '@/components/navigation/BackButton'
+import { unstable_cache } from 'next/cache'
+
+// Cache for 1 hour - tags don't change often
+export const revalidate = 3600
+
+// Cache the tags data
+const getCachedTagsWithCounts = unstable_cache(
+  async () => {
+    const supabase = createAdminClient()
+    
+    // Get all active tags
+    const { data: tags } = await supabase
+      .from('tags')
+      .select('id, name')
+      .eq('status', 'active')
+      .order('name')
+    
+    // Get bookmark counts per tag
+    const { data: tagCounts } = await supabase
+      .from('bookmark_tags')
+      .select('tag_id')
+    
+    // Count usage
+    const countMap: Record<string, number> = {}
+    tagCounts?.forEach((bt: any) => {
+      countMap[bt.tag_id] = (countMap[bt.tag_id] || 0) + 1
+    })
+    
+    // Sort tags by usage count (descending), then by name
+    const sortedTags = (tags || [])
+      .map(tag => ({ ...tag, count: countMap[tag.id] || 0 }))
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count
+        return a.name.localeCompare(b.name)
+      })
+    
+    return sortedTags
+  },
+  ['tags-with-counts'],
+  { revalidate: 3600, tags: ['tags'] }
+)
 
 export default async function TagsPage() {
-  const supabase = createAdminClient()
-  
-  // Get all active tags with usage count
-  const { data: tags } = await supabase
-    .from('tags')
-    .select('id, name')
-    .eq('status', 'active')
-    .order('name')
-  
-  // Get bookmark counts per tag
-  const { data: tagCounts } = await supabase
-    .from('bookmark_tags')
-    .select('tag_id')
-  
-  // Count usage
-  const countMap: Record<string, number> = {}
-  tagCounts?.forEach((bt: any) => {
-    countMap[bt.tag_id] = (countMap[bt.tag_id] || 0) + 1
-  })
-  
-  // Sort tags by usage count (descending), then by name
-  const sortedTags = (tags || [])
-    .map(tag => ({ ...tag, count: countMap[tag.id] || 0 }))
-    .sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count
-      return a.name.localeCompare(b.name)
-    })
+  const sortedTags = await getCachedTagsWithCounts()
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">

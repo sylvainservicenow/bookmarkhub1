@@ -7,10 +7,46 @@ import { BookmarkFavicon } from '@/components/bookmarks/BookmarkFavicon'
 import { CommentSection } from '@/components/comments/CommentSection'
 import { BookmarkActions } from '@/components/bookmarks/BookmarkActions'
 import { BackButton } from '@/components/navigation/BackButton'
+import { ViewCounter } from '@/components/bookmarks/ViewCounter'
+import { unstable_cache } from 'next/cache'
 
-// Force dynamic rendering - no caching
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
+// REMOVED force-dynamic - use ISR instead
+// Revalidate every 10 minutes for individual bookmark pages
+export const revalidate = 600
+
+// Cache the bookmark data fetch
+const getCachedBookmark = unstable_cache(
+  async (id: string) => {
+    const supabase = createAdminClient()
+    const { data: bookmark, error } = await supabase
+      .from('bookmarks')
+      .select(`
+        id,
+        title,
+        url,
+        description,
+        visibility,
+        status,
+        click_count,
+        favicon_url,
+        created_at,
+        creator_id,
+        users:creator_id (name, email),
+        bookmark_tags (
+          tags (id, name, status)
+        ),
+        ratings (rating, user_id),
+        comments (id, author_id, author_name, content, created_at, status)
+      `)
+      .eq('id', id)
+      .single()
+    
+    if (error || !bookmark) return null
+    return bookmark
+  },
+  ['bookmark-detail'],
+  { revalidate: 600, tags: ['bookmarks'] }
+)
 
 export default async function BookmarkPage({
   params,
@@ -18,41 +54,16 @@ export default async function BookmarkPage({
   params: { id: string }
 }) {
   const { id } = params
-  const supabase = createAdminClient()
+  
+  const bookmark = await getCachedBookmark(id)
 
-  // Fetch bookmark with all related data
-  const { data: bookmark, error } = await supabase
-    .from('bookmarks')
-    .select(`
-      id,
-      title,
-      url,
-      description,
-      visibility,
-      status,
-      click_count,
-      favicon_url,
-      created_at,
-      creator_id,
-      users:creator_id (name, email),
-      bookmark_tags (
-        tags (id, name, status)
-      ),
-      ratings (rating, user_id),
-      comments (id, author_id, author_name, content, created_at, status)
-    `)
-    .eq('id', id)
-    .single()
-
-  if (error || !bookmark) {
+  if (!bookmark) {
     notFound()
   }
 
-  // Increment view count on every page load
-  await supabase
-    .from('bookmarks')
-    .update({ click_count: (bookmark.click_count || 0) + 1 })
-    .eq('id', id)
+  // REMOVED: Server-side view count increment
+  // This was causing a DB write on every page load (including bots!)
+  // Now handled by client-side ViewCounter component
 
   // Filter to only show active tags
   const tags = bookmark.bookmark_tags
@@ -76,17 +87,14 @@ export default async function BookmarkPage({
   } catch {}
 
   const isArchived = bookmark.status === 'archived'
-  // Check visibility - default to public if not set
   const isPrivate = bookmark.visibility === 'private'
-  // Use the incremented count for display
-  const viewCount = (bookmark.click_count || 0) + 1
   
   // Handle users - could be array or single object from Supabase join
   const userObj = Array.isArray(bookmark.users) ? bookmark.users[0] : bookmark.users
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Back link - uses browser history to return to previous page (e.g., search with filters) */}
+      {/* Back link */}
       <div className="mb-6">
         <BackButton fallbackHref="/browse" label="Back" />
       </div>
@@ -175,10 +183,11 @@ export default async function BookmarkPage({
             </Link>
           )}
 
-          <div className="flex items-center gap-2">
-            <Eye className="h-4 w-4" />
-            {viewCount} view{viewCount !== 1 ? 's' : ''}
-          </div>
+          {/* Client-side view counter - only increments for real users */}
+          <ViewCounter 
+            bookmarkId={bookmark.id} 
+            initialCount={bookmark.click_count || 0} 
+          />
 
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
