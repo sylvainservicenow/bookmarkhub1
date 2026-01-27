@@ -2,6 +2,9 @@ import { HeroSection } from '@/components/home/HeroSection'
 import { TrendingSection } from '@/components/home/TrendingSection'
 import { TopRatedSection } from '@/components/home/TopRatedSection'
 
+// Cache the homepage for 5 minutes, serve stale while revalidating
+export const revalidate = 300
+
 export default function HomePage() {
   return (
     <div className="min-h-screen">

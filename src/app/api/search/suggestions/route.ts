@@ -3,8 +3,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 /**
  * GET /api/search/suggestions?q=search_term
- * Returns fuzzy search suggestions when the main search returns zero results
- * Uses pg_trgm for similarity matching
+ * 
+ * Returns fuzzy search suggestions when the main search returns zero results.
+ * 
+ * OPTIMIZATION: Added edge caching for common queries.
+ * Search suggestions are the same for all users, so we can cache aggressively.
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -14,13 +17,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ suggestions: [] })
   }
 
+  const normalizedQuery = query.trim().toLowerCase()
+  
   const supabase = createAdminClient()
 
   try {
     // Call the search_suggestions function
     const { data, error } = await supabase
       .rpc('search_suggestions', {
-        search_term: query.trim(),
+        search_term: normalizedQuery,
         similarity_threshold: 0.3,
         max_results: 5
       })
@@ -46,7 +51,15 @@ export async function GET(request: NextRequest) {
         score: item.similarity_score
       }))
 
-    return NextResponse.json({ suggestions })
+    // Cache suggestions for 1 minute - same for all users
+    return NextResponse.json(
+      { suggestions },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        },
+      }
+    )
   } catch (error) {
     console.error('Suggestions API error:', error)
     return NextResponse.json({ suggestions: [] })

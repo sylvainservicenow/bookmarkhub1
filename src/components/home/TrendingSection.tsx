@@ -2,24 +2,25 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import Link from 'next/link'
 import { TrendingUp, Flame } from 'lucide-react'
 import { TrendingBookmarkCard } from './TrendingBookmarkCard'
+import { unstable_cache } from 'next/cache'
 
-export async function TrendingSection() {
-  const supabase = createAdminClient()
-  
-  // Try to get cached trending bookmarks first (refreshed daily)
-  const { data: cachedTrending } = await supabase
-    .from('homepage_cache')
-    .select('data')
-    .eq('cache_key', 'trending_bookmarks')
-    .single()
-  
-  let bookmarks = null
-  
-  if (cachedTrending?.data) {
-    // Use cached data
-    bookmarks = cachedTrending.data
-  } else {
-    // Fallback: direct query (only if cache doesn't exist)
+// Cache trending bookmarks for 5 minutes (combines with ISR)
+const getCachedTrendingBookmarks = unstable_cache(
+  async () => {
+    const supabase = createAdminClient()
+    
+    // First try the homepage_cache table (updated by cron)
+    const { data: cachedTrending } = await supabase
+      .from('homepage_cache')
+      .select('data')
+      .eq('cache_key', 'trending_bookmarks')
+      .single()
+    
+    if (cachedTrending?.data) {
+      return cachedTrending.data
+    }
+    
+    // Fallback: direct query with minimal fields
     const { data } = await supabase
       .from('bookmarks')
       .select(`
@@ -40,8 +41,14 @@ export async function TrendingSection() {
       .order('click_count', { ascending: false })
       .limit(3)
     
-    bookmarks = data
-  }
+    return data
+  },
+  ['trending-bookmarks'],
+  { revalidate: 300, tags: ['trending'] } // 5 minute cache
+)
+
+export async function TrendingSection() {
+  const bookmarks = await getCachedTrendingBookmarks()
 
   if (!bookmarks || bookmarks.length === 0) {
     return null
