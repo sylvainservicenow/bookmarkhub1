@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useSession, signOut } from 'next-auth/react'
-import { createClient } from '@/lib/supabase/client-with-auth'
 import Link from 'next/link'
 import { LogOut, Plus, Bookmark, Heart, User, Search, ExternalLink, Calendar, Mail, Edit, Archive, Shield, Loader2 } from 'lucide-react'
 
@@ -15,11 +14,28 @@ const AVATAR_MAP: Record<string, string> = {
   flower: '🌸', tree: '🌳', mountain: '🏔️', crystal: '💎', robot: '🤖',
 }
 
-interface Profile {
-  name: string | null
-  avatar_url: string | null
-  role: string
-  created_at: string | null
+interface DashboardData {
+  profile: {
+    name: string | null
+    avatar_url: string | null
+    role: string
+    created_at: string | null
+  } | null
+  stats: {
+    bookmarkCount: number
+    archivedCount: number
+    favoriteCount: number
+  }
+  recentBookmarks: Array<{
+    id: string
+    title: string
+    url: string
+    created_at: string
+  }>
+  recentFavorites: Array<{
+    bookmark_id: string
+    bookmarks: { id: string; title: string; url: string }
+  }>
 }
 
 export default function DashboardPage() {
@@ -27,96 +43,40 @@ export default function DashboardPage() {
   const user = session?.user
   const authLoading = status === 'loading'
   
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [stats, setStats] = useState({
-    bookmarkCount: 0,
-    archivedCount: 0,
-    favoriteCount: 0,
-  })
-  const [recentBookmarks, setRecentBookmarks] = useState<any[]>([])
-  const [recentFavorites, setRecentFavorites] = useState<any[]>([])
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [signingOut, setSigningOut] = useState(false)
-  const [supabase] = useState(() => createClient())
 
-  useEffect(() => {
+  // Single API call that fetches ALL dashboard data at once
+  // This reduces 6+ round trips to Supabase down to 1
+  const fetchDashboardData = useCallback(async () => {
     if (!user?.id) return
-
-    const fetchData = async () => {
-      // Fetch profile
-      const { data: profileData } = await supabase
-        .from('users')
-        .select('name, avatar_url, role, created_at')
-        .eq('id', user.id)
-        .single()
+    
+    try {
+      const response = await fetch('/api/dashboard/data')
       
-      setProfile(profileData)
-
-      // Fetch user's active bookmarks count
-      const { count: bookmarkCount } = await supabase
-        .from('bookmarks')
-        .select('*', { count: 'exact', head: true })
-        .eq('creator_id', user.id)
-        .eq('status', 'active')
-
-      // Fetch user's archived bookmarks count
-      const { count: archivedCount } = await supabase
-        .from('bookmarks')
-        .select('*', { count: 'exact', head: true })
-        .eq('creator_id', user.id)
-        .eq('status', 'archived')
-
-      // Fetch user's favorites count
-      const { count: favoriteCount } = await supabase
-        .from('favorites')
-        .select('*, bookmarks!inner(*)', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('bookmarks.status', 'active')
-
-      setStats({
-        bookmarkCount: bookmarkCount || 0,
-        archivedCount: archivedCount || 0,
-        favoriteCount: favoriteCount || 0,
-      })
-
-      // Fetch recent bookmarks
-      const { data: bookmarks } = await supabase
-        .from('bookmarks')
-        .select('id, title, url, created_at')
-        .eq('creator_id', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      setRecentBookmarks(bookmarks || [])
-
-      // Fetch recent favorites
-      const { data: favorites } = await supabase
-        .from('favorites')
-        .select('bookmark_id, bookmarks!inner(id, title, url)')
-        .eq('user_id', user.id)
-        .eq('bookmarks.status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(5)
-
-      setRecentFavorites(favorites || [])
+      if (response.ok) {
+        const data = await response.json()
+        setDashboardData(data)
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error)
+    } finally {
       setLoading(false)
     }
+  }, [user?.id])
 
-    fetchData()
-  }, [user?.id, supabase])
+  useEffect(() => {
+    fetchDashboardData()
+  }, [fetchDashboardData])
 
   const handleSignOut = async () => {
     setSigningOut(true)
     try {
-      // First call our custom signout endpoint to clear cookies
       await fetch('/api/auth/signout', { method: 'POST' })
-      // Then call NextAuth signOut
       await signOut({ redirect: false })
-      // Clear any client-side storage
       if (typeof window !== 'undefined') {
         sessionStorage.clear()
-        // Delete cookies manually on client side too
         document.cookie.split(';').forEach(cookie => {
           const name = cookie.split('=')[0].trim()
           if (name.includes('next-auth') || name.includes('session')) {
@@ -124,7 +84,6 @@ export default function DashboardPage() {
           }
         })
       }
-      // Force a hard navigation to clear all state
       window.location.href = '/'
     } catch (error) {
       console.error('Sign out error:', error)
@@ -143,10 +102,11 @@ export default function DashboardPage() {
     )
   }
 
-  if (!user) {
+  if (!user || !dashboardData) {
     return null // Middleware will redirect
   }
 
+  const { profile, stats, recentBookmarks, recentFavorites } = dashboardData
   const displayName = profile?.name || user.name || user.email?.split('@')[0]
   const avatarEmoji = profile?.avatar_url ? AVATAR_MAP[profile.avatar_url] : null
   const isAdmin = profile?.role === 'admin' || user.role === 'admin'
@@ -271,7 +231,7 @@ export default function DashboardPage() {
           </div>
           {recentBookmarks.length > 0 ? (
             <ul className="space-y-3">
-              {recentBookmarks.map((bookmark: any) => (
+              {recentBookmarks.map((bookmark) => (
                 <li key={bookmark.id} className="group">
                   <Link href={`/bookmark/${bookmark.id}`} className="block">
                     <p className="text-gray-900 group-hover:text-primary-600 line-clamp-1 font-medium">
@@ -308,7 +268,7 @@ export default function DashboardPage() {
           </div>
           {recentFavorites.length > 0 ? (
             <ul className="space-y-3">
-              {recentFavorites.map((fav: any) => (
+              {recentFavorites.map((fav) => (
                 <li key={fav.bookmark_id} className="group">
                   <Link href={`/bookmark/${fav.bookmark_id}`} className="block">
                     <p className="text-gray-900 group-hover:text-primary-600 line-clamp-1 font-medium">
