@@ -5,9 +5,12 @@ import { FiltersSidebar } from '@/components/browse/FiltersSidebar'
 import { BookmarkList } from '@/components/browse/BookmarkList'
 import { ActiveFiltersBar } from '@/components/browse/ActiveFiltersBar'
 import type { Metadata } from 'next'
+import { unstable_cache } from 'next/cache'
 
-// Force dynamic rendering to ensure fresh data
-export const dynamic = 'force-dynamic'
+// REMOVED: export const dynamic = 'force-dynamic' - This was killing your Vercel bill!
+// Instead we use ISR with revalidation + unstable_cache for expensive queries
+
+export const revalidate = 300 // Revalidate every 5 minutes (public content)
 
 export const metadata: Metadata = {
   title: 'Browse ServiceNow Bookmarks',
@@ -25,6 +28,73 @@ export const metadata: Metadata = {
 }
 
 const ITEMS_PER_PAGE = 25
+
+// Cache the tags query - this rarely changes and is called on every page view
+const getCachedTags = unstable_cache(
+  async () => {
+    const supabase = createAdminClient()
+    const { data } = await supabase
+      .from('tags')
+      .select('id, name')
+      .eq('status', 'active')
+      .order('name')
+    return data || []
+  },
+  ['all-tags'],
+  { revalidate: 3600, tags: ['tags'] } // Cache for 1 hour
+)
+
+// Cache public bookmarks query (user-independent)
+const getCachedPublicBookmarks = unstable_cache(
+  async (
+    query: string,
+    selectedTags: string[],
+    sort: string,
+    offset: number,
+    limit: number
+  ) => {
+    const supabase = createAdminClient()
+    
+    let bookmarksQuery = supabase
+      .from('bookmarks')
+      .select(`
+        id,
+        title,
+        url,
+        description,
+        favicon_url,
+        click_count,
+        created_at,
+        visibility,
+        creator_id,
+        users!bookmarks_creator_id_fkey(id, name),
+        bookmark_tags(tag_id, tags(id, name)),
+        ratings(rating)
+      `, { count: 'exact' })
+      .eq('status', 'active')
+      .eq('visibility', 'public')
+    
+    // Text search
+    if (query) {
+      bookmarksQuery = bookmarksQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%,url.ilike.%${query}%`)
+    }
+    
+    // Sorting
+    if (sort === 'popular') {
+      bookmarksQuery = bookmarksQuery.order('click_count', { ascending: false })
+    } else {
+      bookmarksQuery = bookmarksQuery.order('created_at', { ascending: false })
+    }
+    
+    // Pagination
+    bookmarksQuery = bookmarksQuery.range(offset, offset + limit - 1)
+    
+    const { data, count } = await bookmarksQuery
+    return { bookmarks: data || [], totalCount: count || 0 }
+  },
+  ['public-bookmarks'],
+  { revalidate: 300, tags: ['bookmarks'] } // Cache for 5 minutes
+)
 
 export default async function BrowsePage({
   searchParams,
@@ -50,67 +120,55 @@ export default async function BrowsePage({
   const showFavoritesOnly = params.favorites === 'true'
   const showPrivateOnly = params.private === 'true'
   
-  // Parse multiple tags
   const selectedTags = tagsParam ? tagsParam.split(',').filter(Boolean) : (tag ? [tag] : [])
   
-  const supabase = createAdminClient()
   const session = await getServerSession(authOptions)
   const user = session?.user
   
-  // Get user's favorites (only IDs, minimal data)
-  let userFavorites: string[] = []
-  if (user?.id) {
-    const { data: favorites } = await supabase
-      .from('favorites')
-      .select('bookmark_id')
-      .eq('user_id', user.id)
-    userFavorites = favorites?.map(f => f.bookmark_id) || []
-  }
-  
-  // Get user's private bookmarks count (head: true = no data transfer)
-  let privateBookmarksCount = 0
-  if (user?.id) {
-    const { count } = await supabase
-      .from('bookmarks')
-      .select('id', { count: 'exact', head: true })
-      .eq('creator_id', user.id)
-      .eq('visibility', 'private')
-      .eq('status', 'active')
-    privateBookmarksCount = count || 0
-  }
-  
-  // Get all tags for filter (only id and name)
-  const { data: allTags } = await supabase
-    .from('tags')
-    .select('id, name')
-    .eq('status', 'active')
-    .order('name')
-  
-  // Calculate offset for pagination
   const offset = (currentPage - 1) * ITEMS_PER_PAGE
   
-  // Build optimized bookmarks query - only fetch needed columns
-  let bookmarksQuery = supabase
-    .from('bookmarks')
-    .select(`
-      id,
-      title,
-      url,
-      description,
-      favicon_url,
-      click_count,
-      created_at,
-      visibility,
-      creator_id,
-      users!bookmarks_creator_id_fkey(id, name),
-      bookmark_tags!inner(tag_id, tags(id, name)),
-      ratings(rating)
-    `, { count: 'exact' })
-    .eq('status', 'active')
+  // Get cached tags (1 hour cache)
+  const allTags = await getCachedTags()
   
-  // For queries without tag filter, we need left join behavior
-  if (selectedTags.length === 0) {
-    bookmarksQuery = supabase
+  // For logged-out users or simple public queries, use cached results
+  const isSimplePublicQuery = !user && !showFavoritesOnly && !showPrivateOnly && selectedTags.length === 0
+  
+  let bookmarks: any[] = []
+  let totalCount = 0
+  let userFavorites: string[] = []
+  let privateBookmarksCount = 0
+  
+  if (isSimplePublicQuery) {
+    // Use cached query for public browsing (most common case)
+    const result = await getCachedPublicBookmarks(query, selectedTags, sort, offset, ITEMS_PER_PAGE)
+    bookmarks = result.bookmarks
+    totalCount = result.totalCount
+  } else {
+    // For authenticated users or complex queries, do live query
+    const supabase = createAdminClient()
+    
+    // Get user's favorites (only if logged in)
+    if (user?.id) {
+      const { data: favorites } = await supabase
+        .from('favorites')
+        .select('bookmark_id')
+        .eq('user_id', user.id)
+      userFavorites = favorites?.map(f => f.bookmark_id) || []
+    }
+    
+    // Get private count
+    if (user?.id) {
+      const { count } = await supabase
+        .from('bookmarks')
+        .select('id', { count: 'exact', head: true })
+        .eq('creator_id', user.id)
+        .eq('visibility', 'private')
+        .eq('status', 'active')
+      privateBookmarksCount = count || 0
+    }
+    
+    // Build query for authenticated user
+    let bookmarksQuery = supabase
       .from('bookmarks')
       .select(`
         id,
@@ -127,56 +185,63 @@ export default async function BrowsePage({
         ratings(rating)
       `, { count: 'exact' })
       .eq('status', 'active')
+    
+    // Visibility filter
+    if (showPrivateOnly && user?.id) {
+      bookmarksQuery = bookmarksQuery
+        .eq('creator_id', user.id)
+        .eq('visibility', 'private')
+    } else if (user?.id) {
+      bookmarksQuery = bookmarksQuery.or(`visibility.eq.public,creator_id.eq.${user.id}`)
+    } else {
+      bookmarksQuery = bookmarksQuery.eq('visibility', 'public')
+    }
+    
+    // Text search
+    if (query) {
+      bookmarksQuery = bookmarksQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%,url.ilike.%${query}%`)
+    }
+    
+    // Tag filtering
+    if (selectedTags.length > 0) {
+      // Get bookmark IDs that have these tags
+      const { data: taggedBookmarks } = await supabase
+        .from('bookmark_tags')
+        .select('bookmark_id, tags!inner(name)')
+        .in('tags.name', selectedTags)
+      
+      const bookmarkIds = [...new Set(taggedBookmarks?.map(t => t.bookmark_id) || [])]
+      if (bookmarkIds.length > 0) {
+        bookmarksQuery = bookmarksQuery.in('id', bookmarkIds)
+      } else {
+        // No matches, return empty
+        bookmarks = []
+        totalCount = 0
+      }
+    }
+    
+    // Favorites filter
+    if (showFavoritesOnly && userFavorites.length > 0) {
+      bookmarksQuery = bookmarksQuery.in('id', userFavorites)
+    }
+    
+    // Sorting
+    if (sort === 'popular') {
+      bookmarksQuery = bookmarksQuery.order('click_count', { ascending: false })
+    } else {
+      bookmarksQuery = bookmarksQuery.order('created_at', { ascending: false })
+    }
+    
+    // Pagination
+    bookmarksQuery = bookmarksQuery.range(offset, offset + ITEMS_PER_PAGE - 1)
+    
+    const { data, count } = await bookmarksQuery
+    bookmarks = data || []
+    totalCount = count || 0
   }
   
-  // Visibility filter: depends on whether showing private only
-  if (showPrivateOnly && user?.id) {
-    // Show only user's private bookmarks
-    bookmarksQuery = bookmarksQuery
-      .eq('creator_id', user.id)
-      .eq('visibility', 'private')
-  } else if (user?.id) {
-    // Normal mode: public OR own bookmarks
-    bookmarksQuery = bookmarksQuery.or(`visibility.eq.public,creator_id.eq.${user.id}`)
-  } else {
-    bookmarksQuery = bookmarksQuery.eq('visibility', 'public')
-  }
-  
-  // Text search - server side
-  if (query) {
-    bookmarksQuery = bookmarksQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%,url.ilike.%${query}%`)
-  }
-  
-  // Tag filtering - server side via inner join
-  if (selectedTags.length > 0) {
-    // The inner join on bookmark_tags already filters, but we need to match tag names
-    bookmarksQuery = bookmarksQuery.in('bookmark_tags.tags.name', selectedTags)
-  }
-  
-  // Filter by favorites - server side
-  if (showFavoritesOnly && userFavorites.length > 0) {
-    bookmarksQuery = bookmarksQuery.in('id', userFavorites)
-  }
-  
-  // Sorting
-  if (sort === 'popular') {
-    bookmarksQuery = bookmarksQuery.order('click_count', { ascending: false })
-  } else if (sort === 'rated') {
-    // For rated sort, we'll sort client-side after fetching (need aggregation)
-    bookmarksQuery = bookmarksQuery.order('created_at', { ascending: false })
-  } else {
-    // 'recent' or 'discussed' - both use created_at for now
-    bookmarksQuery = bookmarksQuery.order('created_at', { ascending: false })
-  }
-  
-  // Server-side pagination - only fetch what we need!
-  bookmarksQuery = bookmarksQuery.range(offset, offset + ITEMS_PER_PAGE - 1)
-  
-  const { data: bookmarks, count: totalCount } = await bookmarksQuery
-  
-  let filteredBookmarks = bookmarks || []
-  
-  // Filter by rating (needs to be done after fetch since it requires aggregation)
+  // Client-side rating filter (after fetch)
+  let filteredBookmarks = bookmarks
   if (minRating > 0) {
     filteredBookmarks = filteredBookmarks.filter((b: any) => {
       const ratings = b.ratings || []
@@ -186,7 +251,7 @@ export default async function BrowsePage({
     })
   }
   
-  // Sort by rating if requested (after fetch since it requires aggregation)
+  // Sort by rating if requested
   if (sort === 'rated') {
     filteredBookmarks = filteredBookmarks.sort((a: any, b: any) => {
       const avgA = a.ratings?.length > 0 
@@ -199,23 +264,19 @@ export default async function BrowsePage({
     })
   }
   
-  // Calculate pagination info
-  const finalTotalCount = totalCount || 0
-  const totalPages = Math.ceil(finalTotalCount / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Main 2-column layout */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Sidebar - Filters */}
           <aside className="lg:col-span-3">
             <FiltersSidebar
               currentSort={sort}
               selectedTags={selectedTags}
               minRating={minRating}
               searchParams={params}
-              allTags={allTags || []}
+              allTags={allTags}
               isLoggedIn={!!user}
               showFavoritesOnly={showFavoritesOnly}
               favoritesCount={userFavorites.length}
@@ -224,12 +285,11 @@ export default async function BrowsePage({
             />
           </aside>
           
-          {/* Main Content - Bookmark List */}
           <main className="lg:col-span-9">
             <BookmarkList
               bookmarks={filteredBookmarks}
               userFavorites={userFavorites}
-              totalCount={finalTotalCount}
+              totalCount={totalCount}
               query={query}
               selectedTags={selectedTags}
               minRating={minRating}
